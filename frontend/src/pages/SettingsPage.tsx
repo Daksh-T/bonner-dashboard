@@ -3,7 +3,7 @@ import { Check, Download, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { api } from "../api/client";
 import { useAsyncData } from "../hooks/useDashboardData";
 import { applyTheme } from "../lib/theme";
-import { downloadJson } from "../components/Onboarding";
+import { exportSettingsFile } from "../lib/settingsFile";
 import type { AppConfig, Cohort, DataStatus } from "../types";
 
 type ExemptionRow = { email: string; name: string; reason: string; created_at: string };
@@ -282,9 +282,14 @@ function AppearanceSection({
     saveConfig({ theme: t });
   };
 
-  const exportSettings = () => {
-    const name = (config.program_name || "bonner").toLowerCase().replace(/\s+/g, "-");
-    downloadJson(`${name}-settings.json`, config);
+  const exportSettings = async () => {
+    setImportMsg(null);
+    try {
+      const path = await exportSettingsFile(config);
+      setImportMsg(path ? `Saved to ${path} ✓` : "Downloaded ✓");
+    } catch (e) {
+      setImportMsg(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
 
   const importSettings = async (file: File) => {
@@ -360,6 +365,7 @@ function CheckpointsSection({ config, saveConfig }: { config: AppConfig; saveCon
   const [gradYearField, setGradYearField] = useState(config.grad_year_field);
   const [classField, setClassField] = useState(config.class_field);
   const [manualSeniors, setManualSeniors] = useState<string[]>(config.manual_seniors ?? []);
+  const [manualClasses, setManualClasses] = useState<Record<string, string>>(config.manual_classes ?? {});
   const [saving, setSaving] = useState(false);
 
   const setCohort = (i: number, patch: Partial<Cohort>) =>
@@ -401,6 +407,7 @@ function CheckpointsSection({ config, saveConfig }: { config: AppConfig; saveCon
         grad_year_field: gradYearField,
         class_field: classField,
         manual_seniors: manualSeniors,
+        manual_classes: manualClasses,
       });
     } finally {
       setSaving(false);
@@ -502,6 +509,8 @@ function CheckpointsSection({ config, saveConfig }: { config: AppConfig; saveCon
         setClassField={setClassField}
         manualSeniors={manualSeniors}
         setManualSeniors={setManualSeniors}
+        manualClasses={manualClasses}
+        setManualClasses={setManualClasses}
         seniorCohortLabel={cohorts.find((c) => c.label.toLowerCase().includes("senior"))?.label
           ?? cohorts.find((c) => !c.is_default)?.label
           ?? "senior"}
@@ -545,6 +554,8 @@ function SeniorFallbackCard({
   setClassField,
   manualSeniors,
   setManualSeniors,
+  manualClasses,
+  setManualClasses,
   seniorCohortLabel,
 }: {
   gradYearField: string;
@@ -554,6 +565,8 @@ function SeniorFallbackCard({
   setClassField: (v: string) => void;
   manualSeniors: string[];
   setManualSeniors: (v: string[]) => void;
+  manualClasses: Record<string, string>;
+  setManualClasses: (v: Record<string, string>) => void;
   seniorCohortLabel: string;
 }) {
   const [showPicker, setShowPicker] = useState(false);
@@ -578,13 +591,27 @@ function SeniorFallbackCard({
     else setManualSeniors([...manualSeniors, lower]);
   };
 
+  // Distinct class options for the manual override dropdown (mapped labels +
+  // anything already assigned, so existing overrides always show).
+  const classOptions = Array.from(new Set([...Object.values(classLabels), ...Object.values(manualClasses)])).filter(Boolean);
+  const overrideCount = Object.keys(manualClasses).length;
+  const setMemberClass = (email: string, label: string) => {
+    const lower = email.toLowerCase();
+    const updated = { ...manualClasses };
+    if (label) updated[lower] = label;
+    else delete updated[lower];
+    setManualClasses(updated);
+  };
+
   return (
     <Card title="Class & senior detection">
       <p className="mb-3 text-[11px]" style={SUBTLE}>
         Pick the column that holds each member's <strong>graduation year</strong>; we read its first four digits
         (so "Spring 2029" → 2029) and map that to a class with the table below (2029 → Freshman, …). If your export
-        has no graduation year, fall back to a text class column, or mark seniors by hand. Manually selected members
-        are forced into the <strong>{seniorCohortLabel}</strong> requirement tier.
+        has no graduation year, fall back to a text class column, or use the manual picker below to mark seniors and
+        assign classes (Freshman, Sophomore, …) by hand. Members checked as senior are forced into the
+        <strong> {seniorCohortLabel}</strong> requirement tier; a manually assigned class overrides auto-detection
+        everywhere it's displayed.
       </p>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -622,9 +649,12 @@ function SeniorFallbackCard({
       </div>
 
       <div className="mt-4 text-[11px]" style={SUBTLE}>
-        {manualSeniors.length > 0
-          ? `${manualSeniors.length} member${manualSeniors.length === 1 ? "" : "s"} marked senior manually.`
-          : "No manual seniors set — auto-detection is in use."}
+        {manualSeniors.length === 0 && overrideCount === 0
+          ? "No manual overrides set — auto-detection is in use."
+          : [
+              manualSeniors.length > 0 ? `${manualSeniors.length} member${manualSeniors.length === 1 ? "" : "s"} marked senior manually` : "",
+              overrideCount > 0 ? `${overrideCount} manual class override${overrideCount === 1 ? "" : "s"}` : "",
+            ].filter(Boolean).join(" · ") + "."}
       </div>
 
       <button
@@ -634,7 +664,7 @@ function SeniorFallbackCard({
         style={{ background: "var(--surface-3)", border: "1px solid var(--border-3)", color: "var(--text-2)" }}
         aria-expanded={showPicker}
       >
-        {showPicker ? "Hide manual senior picker" : "Pick seniors manually…"}
+        {showPicker ? "Hide manual picker" : "Pick seniors / assign classes manually…"}
       </button>
 
       {showPicker && (
@@ -652,23 +682,41 @@ function SeniorFallbackCard({
             <div className="text-[11px]" style={SUBTLE}>No members loaded yet. Upload a users CSV first (Settings → Data).</div>
           ) : (
             <div className="max-h-[280px] space-y-1 overflow-y-auto pr-1">
+              <div className="flex items-center gap-2.5 px-2.5 pb-1 text-[10px] font-bold uppercase tracking-wide" style={SUBTLE}>
+                <span style={{ width: 15, flexShrink: 0 }} title="Senior tier">Sr</span>
+                <span className="min-w-0 flex-1">Member</span>
+                <span className="shrink-0">Class</span>
+              </div>
               {filteredMembers.map((m) => {
                 const on = selected.has(m.email.toLowerCase());
+                const override = manualClasses[m.email.toLowerCase()] ?? "";
                 return (
-                  <label
+                  <div
                     key={m.email}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2"
-                    style={{ background: on ? "#3498db14" : "transparent" }}
+                    className="flex items-center gap-2.5 rounded-lg px-2.5 py-2"
+                    style={{ background: on || override ? "#3498db14" : "transparent" }}
                   >
                     <input
                       type="checkbox"
                       checked={on}
                       onChange={() => toggleSenior(m.email)}
-                      style={{ width: 15, height: 15, flexShrink: 0 }}
+                      title={`Force into the ${seniorCohortLabel} requirement tier`}
+                      style={{ width: 15, height: 15, flexShrink: 0, cursor: "pointer" }}
                     />
                     <span className="min-w-0 flex-1 truncate text-[12px]" style={{ color: "var(--text)" }}>{m.display_name}</span>
-                    <span className="shrink-0 text-[11px]" style={SUBTLE}>{m.class_label}</span>
-                  </label>
+                    <select
+                      value={override}
+                      onChange={(e) => setMemberClass(m.email, e.target.value)}
+                      title="Manually assign this member's class"
+                      className="shrink-0 text-[11px]"
+                      style={{ width: 130 }}
+                    >
+                      <option value="">auto: {m.class_label || "—"}</option>
+                      {classOptions.map((label) => (
+                        <option key={label} value={label}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
                 );
               })}
               {filteredMembers.length === 0 && (

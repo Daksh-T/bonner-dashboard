@@ -66,6 +66,13 @@ def normalize_users(df: pd.DataFrame, config: AppConfig) -> pd.DataFrame:
         return "Other"
 
     df["class_label"] = [resolve_label(y, f) for y, f in zip(df["grad_year"], class_field_vals)]
+    # Manual class overrides win over auto-detection (and, below, feed cohort
+    # label matching) so a roster with no usable grad year can still be classed.
+    manual_classes = {str(e).lower().strip(): str(l).strip() for e, l in config.manual_classes.items() if str(l).strip()}
+    if manual_classes:
+        df["class_label"] = [
+            manual_classes.get(email, label) for email, label in zip(df["email"], df["class_label"])
+        ]
     df["class_sort"] = df["class_label"].map(lambda label: order_by_label.get(label, other_sort))
     cohorts = [config.cohort_for(int(y), cl) for y, cl in zip(df["grad_year"], df["class_label"])]
     # Manual senior overrides: force listed emails into the senior cohort when the

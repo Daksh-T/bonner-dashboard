@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
+import re
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
@@ -48,6 +52,25 @@ def _save_and_reload(merged: dict[str, Any]) -> dict[str, Any]:
         status["data"] = data_status()
         status["load_error"] = str(exc)
     return status
+
+
+@router.post("/export-file")
+def export_settings_file():
+    """Write the current settings JSON to the user's Downloads folder.
+
+    Only does so in the desktop app (the embedded webview can't handle browser
+    blob downloads); in hosted/browser mode returns ``saved: false`` so the
+    frontend falls back to a normal browser download.
+    """
+    if not os.getenv("BONNER_DESKTOP"):
+        return {"saved": False}
+    config = get_config()
+    slug = re.sub(r"\s+", "-", (config.program_name or "bonner").strip().lower()) or "bonner"
+    downloads = Path.home() / "Downloads"
+    downloads.mkdir(parents=True, exist_ok=True)
+    target = downloads / f"{slug}-settings.json"
+    target.write_text(json.dumps(config.model_dump(mode="json"), indent=2), encoding="utf-8")
+    return {"saved": True, "path": str(target)}
 
 
 @router.post("/reset")

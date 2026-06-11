@@ -63,6 +63,9 @@ def _wait_until_up(url: str, timeout: float = 30.0) -> bool:
 
 def main() -> int:
     _ensure_data_dir()
+    # Lets the backend (and frontend, via /api/config/export-file) know it runs
+    # inside the desktop app rather than a hosted browser deployment.
+    os.environ["BONNER_DESKTOP"] = "1"
 
     # Imported after the data dir is pinned so paths resolve correctly.
     import uvicorn
@@ -92,6 +95,9 @@ def main() -> int:
     try:
         import webview  # pywebview: native OS webview window
 
+        # Without this, clicking an <a download> link renders the blob as
+        # plaintext in the window; with it, the OS shows a save dialog.
+        webview.settings["ALLOW_DOWNLOADS"] = True
         webview.create_window(APP_TITLE, url, width=1280, height=820, min_size=(900, 600))
         webview.start()  # blocks on the main thread until the window is closed
     except ImportError:

@@ -99,6 +99,11 @@ class AppConfig(BaseModel):
     # requirement cohort regardless of grad year.
     manual_seniors: list[str] = Field(default_factory=list)
 
+    # Manual class overrides (lowercase email -> class label, e.g. "Freshman").
+    # Used when the data has no usable graduation year / class field: the label
+    # replaces the auto-detected class and also drives cohort label matching.
+    manual_classes: dict[str, str] = Field(default_factory=dict)
+
     data_source: Literal["csv"] = "csv"
 
     # Ordered roster for the paste-in export (one name per line; "" -> blank row).
