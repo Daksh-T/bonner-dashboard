@@ -72,7 +72,7 @@ export function SlackPage({ dataStatus }: { dataStatus: DataStatus | null }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[22px] font-semibold" style={{ color: "var(--text)" }}>Slack Prep</h1>
+        <h1 className="text-[22px] font-semibold" style={{ color: "var(--text)" }}>Communication Prep</h1>
         <p className="mt-0.5 text-[13px]" style={{ color: "var(--text-muted)" }}>
           Build the send list, review the draft messages, and use the roster file to message people manually later.
         </p>
@@ -85,7 +85,7 @@ export function SlackPage({ dataStatus }: { dataStatus: DataStatus | null }) {
         <div className="space-y-2 text-[12px]" style={{ color: "var(--text-2)" }}>
           <div>1. Build the queue for the statuses you want to message.</div>
           <div>2. Review or edit each message draft here.</div>
-          <div>3. Use the Slack IDs from the roster-backed list below when you send messages manually.</div>
+          <div>3. Copy and queue up/send the messages through Slack or your preferred communication tool</div>
         </div>
       </div>
 

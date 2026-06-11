@@ -16,7 +16,7 @@ const NAV: NavItem[] = [
   { page: "members",     label: "Members",        Icon: Users         },
   { page: "partners",    label: "Partners",       Icon: Handshake     },
   { page: "reflections", label: "Reflections",    Icon: FileText      },
-  { page: "slack",       label: "Slack",          Icon: MessageSquare },
+  { page: "slack",       label: "Communication",  Icon: MessageSquare },
   { page: "export",      label: "Export",         Icon: Zap           },
   { page: "critical",    label: "Critical",       Icon: ShieldAlert   },
   { page: "settings",    label: "Settings",       Icon: Settings      },

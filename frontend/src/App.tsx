@@ -22,7 +22,7 @@ const NAV_TITLES: Record<Page, string> = {
   members: "Members",
   partners: "Partners",
   reflections: "Reflections",
-  slack: "Slack",
+  slack: "Communication",
   export: "Export",
   critical: "Critical",
   settings: "Settings",

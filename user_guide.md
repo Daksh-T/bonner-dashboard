@@ -157,8 +157,9 @@ The first launch opens a guided walkthrough (replayable any time from
   partner engagement; click a partner for a detailed pending breakdown.
 - **Reflections** — members with blank reflections, ranked by severity, with
   the actual blank/filled impacts listed so you can follow up specifically.
-- **Slack** — a message queue for the selected checkpoint: each member gets a
-  pre-filled message from your status templates, editable before you send it.
+- **Communication** — a message queue for the selected checkpoint: each member
+  gets a pre-filled message from your status templates, editable here; copy and
+  send through Slack or whatever tool your program uses.
 - **Export** — checkpoint hour tables and the **roster-order export**: paste
   your spreadsheet's name column into Settings once, then copy a single
   column of hours that lines up row-for-row with your sheet.
