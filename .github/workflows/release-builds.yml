@@ -1,0 +1,105 @@
+# Builds standalone desktop binaries (macOS / Windows / Linux) and attaches
+# them to a GitHub Release whenever a PR is merged into main.
+#
+# Cost notes (GitHub Pro): public repos run free on standard runners. On a
+# private repo this run costs roughly 75-90 "billed" minutes (macOS counts
+# 10x, Windows 2x) out of the 3,000 included per month, so dozens of releases
+# a month stay within the free quota. timeout-minutes caps a hung run.
+
+name: Release builds
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-builds-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Only on an actual merge (or a manual dispatch), not on closed-unmerged PRs.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: BonnerDashboard-linux-x64.tar.gz
+          - os: windows-latest
+            artifact: BonnerDashboard-windows-x64.zip
+          - os: macos-latest
+            artifact: BonnerDashboard-macos-arm64.zip
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build frontend
+        shell: bash
+        run: |
+          cd frontend
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Package with PyInstaller
+        shell: bash
+        run: |
+          cd backend
+          uv sync --extra desktop
+          uv run pyinstaller ../packaging/bonner.spec --noconfirm --distpath dist --workpath build
+
+      - name: Archive (Linux)
+        if: runner.os == 'Linux'
+        run: tar -C backend/dist -czf ${{ matrix.artifact }} BonnerDashboard
+
+      - name: Archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path backend/dist/BonnerDashboard -DestinationPath ${{ matrix.artifact }}
+
+      - name: Archive (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd backend/dist
+          zip -qry "${GITHUB_WORKSPACE}/${{ matrix.artifact }}" BonnerDashboard.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          retention-days: 3
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # The merged PR's title becomes the release name and its description the
+      # release notes (GitHub's auto-generated notes are appended), so writing
+      # a good PR is all it takes to ship a documented release.
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: ${{ github.event.pull_request.title || format('Build {0}', github.run_number) }}
+          body: ${{ github.event.pull_request.body }}
+          generate_release_notes: true
+          files: artifacts/*
