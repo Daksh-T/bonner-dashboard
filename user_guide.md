@@ -56,7 +56,7 @@ is required, and nothing leaves your machine.
 | [uv](https://docs.astral.sh/uv/) | Python runtime & deps | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | [Bun](https://bun.sh) | Builds the web UI | `curl -fsSL https://bun.sh/install \| bash` |
 
-(Or skip both by using a **packaged release binary** — see below.)
+(Or skip both by using a **prebuilt installer** — Option B below.)
 
 ### Option A — desktop app from source (recommended)
 
@@ -71,7 +71,45 @@ uv run python desktop.py                      # launch
 The app opens in a native window (or your browser if `pywebview` isn't
 available). Your settings and uploads persist between launches.
 
-### Option B — dev mode (hot reload, two servers)
+### Option B — prebuilt installer (easiest, no tools needed)
+
+Download the right file from the
+[Releases page](https://github.com/Daksh-T/bonner-dashboard/releases):
+
+| You have | Download |
+|----------|----------|
+| Mac with Apple Silicon (M1 or newer) | `BonnerDashboard-macos-arm64.dmg` |
+| Mac with an Intel processor | `BonnerDashboard-macos-x86_64.dmg` |
+| Windows PC (almost all) | `BonnerDashboard-windows-x64-setup.exe` |
+| Windows on ARM (Surface/Snapdragon) | `BonnerDashboard-windows-arm64-setup.exe` |
+| Linux | `BonnerDashboard-linux-x64.tar.gz` |
+
+The builds are **not code-signed** (that requires a paid developer
+certificate), so each OS shows a one-time warning. Here's how to get past it:
+
+**macOS** — open the DMG and drag **BonnerDashboard** onto the Applications
+shortcut, then launch it from Applications:
+
+1. macOS blocks the first launch: *"BonnerDashboard" Not Opened — Apple could
+   not verify…*. Click **Done** (not Move to Trash).
+2. Open **System Settings → Privacy & Security**, scroll to the bottom — you'll
+   see *"BonnerDashboard" was blocked…*. Click **Open Anyway**.
+3. Confirm **Open Anyway** in the dialog (you may need your password/Touch ID).
+4. That's it — every later launch works normally.
+
+**Windows** — run the setup EXE. It installs into your user profile, so **no
+admin rights are needed**:
+
+1. If SmartScreen shows *"Windows protected your PC"*, click **More info**,
+   then **Run anyway**.
+2. Follow the installer (it adds a Start Menu entry and an optional desktop
+   icon, and can launch the app right away).
+3. To remove it later, use Settings → Apps like any other program.
+
+Release assets are scanned with **VirusTotal** and the report links are
+attached to each release's notes if you want a second opinion.
+
+### Option C — dev mode (hot reload, two servers)
 
 ```bash
 cd backend && uv sync
@@ -80,15 +118,6 @@ cd .. && ./start.sh
 ```
 
 Backend: `http://127.0.0.1:8000` · Frontend: `http://127.0.0.1:3000`
-
-### Option C — packaged binary
-
-If you downloaded a release build (or ran `./packaging/build.sh`), there is no
-install at all: unzip and run `BonnerDashboard` (`BonnerDashboard.app` on
-macOS). Python and Node are **not** required on that machine.
-
-> macOS will warn about an unsigned app the first time: right-click →
-> **Open** → Open. On Windows, choose **More info → Run anyway**.
 
 ## Getting your data out of GivePulse
 
