@@ -33,7 +33,7 @@ upload your own CSVs.
 ### Prerequisites
 
 - [uv](https://docs.astral.sh/uv/) (Python) and [Bun](https://bun.sh) (frontend)
-- …or neither, if you use a packaged release binary (see below)
+- …or neither, if you use a prebuilt installer (see below)
 
 ### Desktop app (one window) — recommended for daily use
 
@@ -47,6 +47,25 @@ uv run python desktop.py
 launcher falls back to your default browser. State persists per-user (see
 below), so onboarding runs only on the true first launch.
 
+### Prebuilt installers (no Python/Node needed)
+
+Grab the latest [Release](https://github.com/Daksh-T/bonner-dashboard/releases):
+a **DMG** for macOS (Apple Silicon `arm64` or Intel `x86_64`), a per-user
+**setup EXE** for Windows (x64, plus experimental arm64) that needs **no admin
+rights**, and a tarball for Linux. The builds are unsigned, so the OS will
+warn you once on first launch:
+
+- **macOS**: open the DMG, drag the app to Applications, launch it. When
+  macOS blocks it ("Apple could not verify…"), go to **System Settings →
+  Privacy & Security**, scroll down to the message about BonnerDashboard, and
+  click **Open Anyway**, then confirm. This is needed only once.
+- **Windows**: SmartScreen may show "Windows protected your PC" — click
+  **More info → Run anyway**. The installer puts everything in your user
+  profile, so no admin prompt.
+
+Release assets are scanned with VirusTotal; the report links are attached to
+each release's notes.
+
 ### Dev mode (hot reload, two servers)
 
 ```bash
@@ -57,14 +76,14 @@ cd .. && ./start.sh
 
 Backend: `http://127.0.0.1:8000` · Frontend (Vite): `http://127.0.0.1:3000`
 
-### Standalone binary (no Python/Node on the target machine)
+### Building the installers yourself
 
 `./packaging/build.sh` builds the frontend and packages everything with
 PyInstaller into `backend/dist/` (a folder app, plus `BonnerDashboard.app` on
-macOS). Run it on each OS you target — or let CI do it: a GitHub Actions
-workflow (see `.github/workflows/` once the release PR is merged) builds
-macOS/Windows/Linux binaries and attaches them to a GitHub Release whenever a
-PR is merged to `main`.
+macOS). Or let CI do it: `.github/workflows/release-builds.yml` builds all
+platform installers and attaches them to a GitHub Release whenever a PR is
+merged to `main` — with the PR title/description becoming the release
+name/notes.
 
 ### Where state lives
 

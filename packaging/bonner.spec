@@ -54,6 +54,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,  # GUI app: no terminal window
+    icon=str(ROOT / "packaging" / "icon.ico"),
 )
 
 coll = COLLECT(
@@ -72,6 +73,6 @@ if sys.platform == "darwin":
     app = BUNDLE(
         coll,
         name="BonnerDashboard.app",
-        icon=None,
+        icon=str(ROOT / "packaging" / "icon.icns"),
         bundle_identifier="edu.sewanee.bonnerdashboard",
     )
