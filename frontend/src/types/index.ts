@@ -1,6 +1,7 @@
 export type Status = "Red" | "Yellow" | "Blue" | "Green" | "Exempt";
 
 export interface DataStatus {
+  demo_mode?: boolean;
   loaded: boolean;
   active_checkpoint: string;
   users_file: string | null;

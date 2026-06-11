@@ -300,7 +300,10 @@ def load_dashboard_data(checkpoint_name: str | None = None, force: bool = False,
 
 
 def data_status() -> dict:
+    from ..config import DEMO_MODE
+
     return {
+        "demo_mode": DEMO_MODE,
         "loaded": STATE.member_df is not None,
         "active_checkpoint": STATE.active_checkpoint,
         "source": STATE.source_name,

@@ -7,6 +7,9 @@ Slack-ready outreach messages. Runs entirely on your **GivePulse CSV exports**
 through exporting your data and configuring checkpoints, cohorts, and
 reflections.
 
+**🔗 Live demo:** <https://bonner-dashboard-demo.onrender.com> — fabricated
+data, free Render tier (first load can take ~a minute while it wakes up).
+
 **📖 New here? Read the [User Guide](user_guide.md)** — it covers every
 feature, the full GivePulse export workflow, and step-by-step local setup.
 
@@ -90,7 +93,9 @@ To host it (Render, Railway, Fly, or any container host):
 1. Push this repo to GitHub.
 2. On Render, create a **Blueprint** from the repo — `render.yaml` builds the
    root `Dockerfile` and exposes the app at an `onrender.com` URL
-   (`/health` is the health check; the app binds `0.0.0.0:$PORT`).
+   (`/health` is the health check; the app binds `0.0.0.0:$PORT`). The
+   blueprint sets `BONNER_DEMO_MODE=1`, which swaps the setup wizard for a
+   "this is a demo" popup — remove that env var for a real hosted instance.
 
 **Caveats for web deployment:** the app is single-tenant and has **no
 authentication** — anyone with the URL can see member data and change

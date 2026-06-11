@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, Database, Loader2, Menu, RefreshCw } from "lucide-react";
+import { AlertCircle, BarChart3, Database, ExternalLink, Loader2, Menu, RefreshCw, X } from "lucide-react";
 import { api } from "./api/client";
 import { Sidebar } from "./components/Sidebar";
 import { MemberProfile } from "./components/MemberProfile";
@@ -30,6 +30,9 @@ const NAV_TITLES: Record<Page, string> = {
 
 type LoadState = "idle" | "loading" | "loaded" | "error";
 
+const PROJECT_REPO_URL = "https://github.com/Daksh-T/bonner-dashboard";
+const DEMO_POPUP_DISMISSED_KEY = "bonner-demo-popup-dismissed";
+
 export default function App() {
   const [page, setPage]             = useState<Page>("overview");
   const [profileEmail, setProfile]  = useState<string | null>(null);
@@ -38,7 +41,9 @@ export default function App() {
   const [loadError, setLoadError]   = useState<string | null>(null);
   const [checkpointNames, setCheckpointNames] = useState<string[]>([]);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const [showDemoPopup, setShowDemoPopup] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const demoMode = dataStatus?.demo_mode === true;
 
   const doLoad = useCallback(async (reload = false) => {
     setLoadState("loading");
@@ -79,6 +84,14 @@ export default function App() {
       })
       .catch(() => {});
   }, [doLoad, refreshCheckpoints]);
+
+  useEffect(() => {
+    if (!demoMode) return;
+    setShowWalkthrough(false);
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(DEMO_POPUP_DISMISSED_KEY) === "1"; } catch { /* private mode */ }
+    if (!dismissed) setShowDemoPopup(true);
+  }, [demoMode]);
 
   const closeWalkthrough = useCallback(() => {
     setShowWalkthrough(false);
@@ -187,7 +200,15 @@ export default function App() {
         </div>
       </main>
 
-      {showWalkthrough && <Onboarding onClose={closeWalkthrough} onComplete={onOnboardingDone} />}
+      {showWalkthrough && !demoMode && <Onboarding onClose={closeWalkthrough} onComplete={onOnboardingDone} />}
+      {showDemoPopup && demoMode && (
+        <DemoPopup
+          onClose={() => {
+            setShowDemoPopup(false);
+            try { localStorage.setItem(DEMO_POPUP_DISMISSED_KEY, "1"); } catch { /* private mode */ }
+          }}
+        />
+      )}
 
       {profileEmail && (
         <MemberProfile
@@ -196,6 +217,41 @@ export default function App() {
           onClose={() => setProfile(null)}
         />
       )}
+    </div>
+  );
+}
+
+function DemoPopup({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--overlay)" }}>
+      <div className="w-full max-w-md rounded-2xl p-6" style={{ background: "var(--surface)", border: "1px solid var(--border-3)" }}>
+        <div className="flex items-start justify-between">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "#3498db14", border: "1px solid #3498db33" }}>
+            <BarChart3 size={20} style={{ color: "#3498db" }} />
+          </span>
+          <button onClick={onClose} aria-label="Dismiss" className="rounded-md p-1" style={{ color: "var(--text-muted)" }}><X size={16} /></button>
+        </div>
+        <h2 className="mt-4 text-[17px] font-semibold" style={{ color: "var(--text)" }}>You're viewing a live demo</h2>
+        <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--text-2)" }}>
+          Everything here runs on <strong>fabricated demo data</strong> — explore freely. To run the dashboard on your own
+          program's GivePulse exports, grab the app from GitHub: it runs locally on your machine, with a guided setup and
+          downloadable desktop builds.
+        </p>
+        <div className="mt-5 flex items-center gap-3">
+          <a
+            href={PROJECT_REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-[12px] font-medium"
+            style={{ background: "#3498db", color: "#fff" }}
+          >
+            Get the app on GitHub <ExternalLink size={13} />
+          </a>
+          <button onClick={onClose} className="rounded-xl px-4 py-2 text-[12px] font-medium" style={{ background: "var(--surface-3)", border: "1px solid var(--border-3)", color: "var(--text-2)" }}>
+            Keep exploring
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -15,6 +15,10 @@ from pathlib import Path
 DEFAULT_TIMEZONE = "America/Chicago"
 APP_DIR_NAME = "BonnerDashboard"
 
+# Hosted-demo mode (set in render.yaml): the UI swaps the setup wizard for a
+# "this is a demo" call-to-action pointing at the project repo.
+DEMO_MODE = os.getenv("BONNER_DEMO_MODE", "") == "1"
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 IS_FROZEN = bool(getattr(sys, "frozen", False))
 
