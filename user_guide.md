@@ -1,6 +1,6 @@
-# Bonner Hour Dashboard — User Guide
+# Bonner Dashboard — User Guide
 
-A complete guide to setting up and using the dashboard for any Bonner-style
+A complete guide to setting up and using the dashboard for any Bonner
 service program. For developer/deployment details see the [README](README.md).
 
 ---
