@@ -74,10 +74,6 @@ FRONTEND_DIST_PATH = _path_from_env("BONNER_FRONTEND_DIST_PATH", BUNDLE_DIR / "f
 UPLOAD_DIR = _path_from_env("BONNER_UPLOAD_DIR", DATA_DIR / "uploads")
 DB_PATH = _path_from_env("BONNER_DB_PATH", DATA_DIR / "bonner.db")
 
-# Optional local roster mapping name/email/slack_id -> used only to enrich the
-# Slack queue with Slack IDs. The app works fine without it.
-ROSTER_PATH = _path_from_env("BONNER_ROSTER_PATH", BASE_DIR / "bonner_slack_roster.csv")
-
 STATUS_COLORS = {
     "Red": "#e74c3c",
     "Yellow": "#f39c12",

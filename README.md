@@ -74,9 +74,8 @@ desktop/packaged app uses a per-user app-data dir instead
 (`~/Library/Application Support/BonnerDashboard` on macOS,
 `%APPDATA%\BonnerDashboard` on Windows, `~/.local/share/BonnerDashboard` on
 Linux). Override with `BONNER_DATA_DIR`; other path overrides:
-`BONNER_CSV_DIR`, `BONNER_UPLOAD_DIR`, `BONNER_ROSTER_PATH`,
-`BONNER_EXEMPTIONS_PATH`, `BONNER_SUPPORT_SEED_PATH`,
-`BONNER_FRONTEND_DIST_PATH`.
+`BONNER_CSV_DIR`, `BONNER_UPLOAD_DIR`, `BONNER_EXEMPTIONS_PATH`,
+`BONNER_SUPPORT_SEED_PATH`, `BONNER_FRONTEND_DIST_PATH`.
 
 ## Using it as a web app
 
@@ -127,4 +126,3 @@ of each kind wins; demo CSVs are used only until you upload your own.
 
 - All included emails use `example.edu` / `example.org` domains; every name,
   hour, reflection, and exemption is fabricated.
-- Slack tokens, if used, stay local in `.env` (gitignored).

@@ -52,7 +52,6 @@ export function SlackPage({ dataStatus }: { dataStatus: DataStatus | null }) {
         status,
         colorHex,
         String(row.display_name ?? row.email ?? ""),
-        String(row.slack_id ?? ""),
         String(row.message ?? "").replace(/\n/g, " ").trim(),
       ];
       return fields.join(";");
@@ -66,15 +65,12 @@ export function SlackPage({ dataStatus }: { dataStatus: DataStatus | null }) {
     }
   };
 
-  const readyRows = queue.filter((row) => row.slack_id && !row.delivery_issue);
-  const missingRows = queue.filter((row) => !row.slack_id || row.delivery_issue);
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-[22px] font-semibold" style={{ color: "var(--text)" }}>Communication Prep</h1>
         <p className="mt-0.5 text-[13px]" style={{ color: "var(--text-muted)" }}>
-          Build the send list, review the draft messages, and use the roster file to message people manually later.
+          Build the send list, review the draft messages, and copy them out to wherever you message your members.
         </p>
       </div>
 
@@ -125,14 +121,6 @@ export function SlackPage({ dataStatus }: { dataStatus: DataStatus | null }) {
           </div>
         </div>
 
-        {!queueLoading && queue.length > 0 && (
-          <div className="mb-4 grid gap-3 md:grid-cols-3">
-            <SummaryCard label="Ready to send" value={readyRows.length} tone="#27ae60" />
-            <SummaryCard label="Missing Slack ID" value={missingRows.length} tone="#e74c3c" />
-            <SummaryCard label="Total drafts" value={queue.length} tone="#3498db" />
-          </div>
-        )}
-
         {queueLoading && (
           <div className="space-y-1.5">
             {[0, 1, 2, 3, 4].map((i) => (
@@ -152,7 +140,7 @@ export function SlackPage({ dataStatus }: { dataStatus: DataStatus | null }) {
                 Copy all visible rows
               </button>
               <span className="text-[11px]" style={{ color: copyMsg ? "#27ae60" : "var(--text-muted)" }}>
-                {copyMsg || "Format: status;color hex;name;slack id;message"}
+                {copyMsg || `Format: status;color hex;name;message — ${queue.length} draft${queue.length === 1 ? "" : "s"}`}
               </span>
             </div>
             <div className="space-y-1.5">
@@ -177,19 +165,6 @@ export function SlackPage({ dataStatus }: { dataStatus: DataStatus | null }) {
   );
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone: string }) {
-  return (
-    <div className="rounded-lg p-3" style={{ background: "var(--surface-3)", border: `1px solid ${tone}30` }}>
-      <div className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--text-muted)" }}>
-        {label}
-      </div>
-      <div className="mt-1 text-[22px] font-semibold" style={{ color: tone }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function QueueRow({
   row,
   onUpdateMessage,
@@ -201,7 +176,6 @@ function QueueRow({
   const [draft, setDraft] = useState(String(row.message ?? ""));
   const textRef = useRef<HTMLTextAreaElement>(null);
   const color = STATUS_COLORS[(row.status as Status) ?? "Exempt"] ?? "var(--text-muted)";
-  const hasIssue = Boolean(row.delivery_issue);
 
   const save = () => {
     setEditing(false);
@@ -215,10 +189,7 @@ function QueueRow({
   return (
     <div
       className="rounded-lg p-3"
-      style={{
-        background: "var(--surface-3)",
-        border: `1px solid ${hasIssue ? "#e74c3c30" : "var(--border)"}`,
-      }}
+      style={{ background: "var(--surface-3)", border: "1px solid var(--border)" }}
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
@@ -230,16 +201,10 @@ function QueueRow({
             <span className="rounded-full px-1.5 py-0.5 text-[11px]" style={{ background: `${color}18`, color }}>
               {String(row.status ?? "")}
             </span>
-            {hasIssue && (
-              <span className="rounded-full px-1.5 py-0.5 text-[11px]" style={{ background: "#e74c3c18", color: "#e74c3c" }}>
-                {String(row.delivery_issue)}
-              </span>
-            )}
           </div>
 
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-            <span>{String(row.email ?? "")}</span>
-            <span>{row.slack_id ? `Slack ID: ${String(row.slack_id)}` : "No Slack ID in roster"}</span>
+          <div className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
+            {String(row.email ?? "")}
           </div>
 
           {editing ? (
