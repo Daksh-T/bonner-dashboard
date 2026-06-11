@@ -124,14 +124,34 @@ jobs:
           generate_release_notes: true
           files: artifacts/*
 
-      # Scan the release assets with VirusTotal (free tier) and append the
-      # analysis links to the release notes. Best-effort: rate limits or VT
-      # hiccups must never block a release.
+      # Scan the release assets with VirusTotal (free tier). Best-effort: rate
+      # limits or VT hiccups must never block a release.
       - uses: crazy-max/ghaction-virustotal@v5
+        id: virustotal
         continue-on-error: true
         with:
           vt_api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
-          update_release_body: true
           request_rate: 4
           files: |
             artifacts/*
+
+      # The action's update_release_body only works on `release`-triggered
+      # workflows, and ours creates the release itself — so append the analysis
+      # links to the release notes by hand from the action's output.
+      - name: Append VirusTotal links to release notes
+        if: steps.virustotal.outputs.analysis != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANALYSIS: ${{ steps.virustotal.outputs.analysis }}
+        run: |
+          tag="build-${{ github.run_number }}"
+          gh release view "$tag" -R "${{ github.repository }}" --json body --jq .body > notes.md
+          {
+            echo ""
+            echo "## 🛡 VirusTotal analysis"
+            echo "$ANALYSIS" | tr ',' '\n' | while IFS='=' read -r file url; do
+              echo "- [$(basename "$file")]($url)"
+            done
+          } >> notes.md
+          gh release edit "$tag" -R "${{ github.repository }}" --notes-file notes.md
