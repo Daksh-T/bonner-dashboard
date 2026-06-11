@@ -73,7 +73,6 @@ DB_PATH = _path_from_env("BONNER_DB_PATH", DATA_DIR / "bonner.db")
 # Optional local roster mapping name/email/slack_id -> used only to enrich the
 # Slack queue with Slack IDs. The app works fine without it.
 ROSTER_PATH = _path_from_env("BONNER_ROSTER_PATH", BASE_DIR / "bonner_slack_roster.csv")
-ENV_PATH = BASE_DIR / ".env"
 
 STATUS_COLORS = {
     "Red": "#e74c3c",

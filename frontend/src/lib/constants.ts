@@ -8,9 +8,6 @@ export const STATUS_COLORS: Record<Status, string> = {
   Exempt: "#6b7280",
 };
 
-// Keep old export name for any stale imports
-export const statusColors = STATUS_COLORS;
-
 export const STATUS_ORDER: Status[] = ["Red", "Blue", "Yellow", "Green", "Exempt"];
 
 export const STATUS_LABEL: Record<Status, string> = {
