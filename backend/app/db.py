@@ -5,7 +5,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-from .config import DB_PATH, EXEMPTIONS_SEED_PATH, SUPPORT_SEED_PATH
+from .config import DB_PATH, EXEMPTIONS_SEED_PATH, SUPPORT_SEED_PATH, UPLOAD_DIR
 
 
 def connect() -> sqlite3.Connection:
@@ -43,8 +43,47 @@ def init_db() -> None:
             );
             """
         )
-    migrate_legacy_exemptions()
-    migrate_demo_support_tracking()
+    # Demo seeds only apply to a fresh install; once the user has uploaded their
+    # own CSVs the demo rows must not come back on restart.
+    if _has_user_uploads():
+        clear_demo_seed_data()
+    else:
+        migrate_legacy_exemptions()
+        migrate_demo_support_tracking()
+
+
+def _has_user_uploads() -> bool:
+    return UPLOAD_DIR.exists() and any(UPLOAD_DIR.glob("*.csv"))
+
+
+def _seed_emails(path, key: str) -> list[str]:
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text())
+    except Exception:
+        return []
+    return [
+        email
+        for entry in payload.get(key, [])
+        if (email := str(entry.get("email", "")).strip().lower())
+    ]
+
+
+def clear_demo_seed_data() -> None:
+    """Remove the demo-seeded exemptions and support-tracking rows (by the exact
+    emails listed in the bundled seed files). User-created rows are untouched."""
+    exemption_emails = _seed_emails(EXEMPTIONS_SEED_PATH, "exemptions")
+    support_emails = _seed_emails(SUPPORT_SEED_PATH, "support_tracking")
+    if not exemption_emails and not support_emails:
+        return
+    with connect() as conn:
+        if exemption_emails:
+            placeholders = ",".join("?" for _ in exemption_emails)
+            conn.execute(f"DELETE FROM exemptions WHERE email IN ({placeholders})", exemption_emails)
+        if support_emails:
+            placeholders = ",".join("?" for _ in support_emails)
+            conn.execute(f"DELETE FROM support_tracking WHERE email IN ({placeholders})", support_emails)
 
 
 # --------------------------------------------------------------------------- #

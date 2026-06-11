@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from .. import db
 from ..config import UPLOAD_DIR
 from ..models import ActiveCheckpointRequest, LoadRequest
 from ..settings import default_checkpoint_name, get_config, resolve_checkpoint, today_checkpoint
 from ..data.processor import data_status, load_dashboard_data
-from ..data.loader import STATE
+from ..data.loader import STATE, discover_latest_exports
 
 router = APIRouter(prefix="/api", tags=["data"])
 
@@ -40,22 +42,34 @@ async def upload_csv(kind: str, file: UploadFile = File(...)):
     stamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     target = UPLOAD_DIR / f"{kind}-upload-{stamp}.csv"
     target.write_bytes(await file.read())
+    # Real data has arrived: drop the demo seed rows so they don't linger.
+    db.clear_demo_seed_data()
     return {"saved": True, "filename": target.name, "kind": kind}
 
 
 @router.get("/data/columns")
 def data_columns():
     """Column names available in the uploaded users/impacts CSVs, so the UI can let
-    admins pick reflection fields and the class/graduation field from real data."""
+    admins pick reflection fields and the class/graduation field from real data.
+
+    Reads the headers of the newest CSVs on disk so the picker always reflects the
+    files currently in use, even if the last full load failed or hasn't run yet."""
     def cols(df) -> list[str]:
         if df is None:
             return []
         return [str(c) for c in df.columns]
 
-    return {
-        "users": cols(STATE.raw_users_df),
-        "impacts": cols(STATE.raw_impacts_df),
-    }
+    try:
+        users_path, impacts_path = discover_latest_exports()
+        return {
+            "users": cols(pd.read_csv(users_path, nrows=0)),
+            "impacts": cols(pd.read_csv(impacts_path, nrows=0)),
+        }
+    except Exception:
+        return {
+            "users": cols(STATE.raw_users_df),
+            "impacts": cols(STATE.raw_impacts_df),
+        }
 
 
 @router.get("/checkpoints")
