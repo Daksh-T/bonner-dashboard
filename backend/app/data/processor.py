@@ -15,14 +15,15 @@ from ..settings import (
     resolve_checkpoint,
 )
 from .loader import STATE
-from .sources import get_source
+from .sources import CANONICAL_IMPACT_COLUMNS, CANONICAL_USER_COLUMNS, get_source
+from .sources.base import ensure_columns
 
 
 # --------------------------------------------------------------------------- #
 # Normalization (raw source DataFrame -> typed/cleaned DataFrame)
 # --------------------------------------------------------------------------- #
 def normalize_users(df: pd.DataFrame, config: AppConfig) -> pd.DataFrame:
-    df = df.copy()
+    df = ensure_columns(df.copy(), CANONICAL_USER_COLUMNS)
     grad_field = config.grad_year_field or "Graduation Term"
     # Keep only rows with a graduation term *if* that yields a non-empty roster;
     # sources without a grad term (some GivePulse groups) keep everyone.
@@ -32,6 +33,8 @@ def normalize_users(df: pd.DataFrame, config: AppConfig) -> pd.DataFrame:
             df = df[has_term]
 
     df["email"] = df["Email"].astype(str).str.lower().str.strip()
+    # Drop rows without a usable email (blank export rows parse as "nan").
+    df = df[df["email"].str.contains("@", na=False)]
     # Pull the first 4-digit run from the configured column so "Spring 2029",
     # "2029", and "2029-05" all resolve to 2029.
     grad_raw = df.get(grad_field, pd.Series("", index=df.index)).astype(str)
@@ -93,7 +96,7 @@ def normalize_users(df: pd.DataFrame, config: AppConfig) -> pd.DataFrame:
 
 
 def normalize_impacts(df: pd.DataFrame, checkpoint: RuntimeCheckpoint, config: AppConfig) -> pd.DataFrame:
-    df = df.copy()
+    df = ensure_columns(df.copy(), CANONICAL_IMPACT_COLUMNS)
     df["Start Date"] = pd.to_datetime(df.get("Start Date"), format="%m/%d/%Y", errors="coerce")
     df["Date Created"] = pd.to_datetime(df.get("Date Created"), format="%m/%d/%Y", errors="coerce")
     df["Hours Served"] = pd.to_numeric(df.get("Hours Served"), errors="coerce").fillna(0.0)
@@ -122,6 +125,15 @@ def safe_text(value: object, fallback: str = "") -> str:
         return fallback
     text = str(value).strip()
     return text if text else fallback
+
+
+def reflection_text(row: pd.Series, config: AppConfig) -> str:
+    """First non-empty value among the configured reflection fields."""
+    for field in config.reflection.fields:
+        value = safe_text(row.get(field))
+        if value:
+            return value
+    return ""
 
 
 def remaining_weeks_until_final(current_date: date, config: AppConfig) -> int:
@@ -178,12 +190,13 @@ def build_member_table(users_df: pd.DataFrame, impacts_df: pd.DataFrame, checkpo
     member_df["still_needed"] = (member_df["required"] - member_df["hours"]).clip(lower=0)
     member_df["final_still_needed"] = (member_df["final_required"] - member_df["hours"]).clip(lower=0)
     member_df["progress_pct"] = ((member_df["hours"] / member_df["required"]) * 100).clip(upper=100).fillna(0)
-    member_df["active_weeks"] = (
-        member_df["email"]
-        .map(impacts_df.groupby("email")["Start Date"].apply(lambda s: s.dt.to_period("W").nunique()))
-        .fillna(0)
-        .astype(int)
+    # An empty groupby keeps the datetime dtype, which Series.map can't cast.
+    weeks_by_email = (
+        impacts_df.groupby("email")["Start Date"].apply(lambda s: s.dt.to_period("W").nunique())
+        if not impacts_df.empty
+        else pd.Series(dtype=float)
     )
+    member_df["active_weeks"] = member_df["email"].map(weeks_by_email).fillna(0).astype(int)
     member_df["avg_week"] = (member_df["hours"] / member_df["active_weeks"].replace(0, 1)).round(2)
     weeks_remaining = remaining_weeks_until_final(reference_date, config)
     member_df["weeks_remaining_to_cp4"] = weeks_remaining
@@ -337,9 +350,7 @@ def get_member_profile(email: str) -> dict:
         .groupby("week")["Hours Served"].sum().reset_index()
     )
     partner_breakdown = impacts.groupby("Group")["Hours Served"].sum().sort_values(ascending=False).reset_index()
-    history = impacts.sort_values("Start Date", ascending=False)[
-        ["Start Date", "Group", "Event Name", "Hours Served", "Verified", "Review/Reflection"]
-    ]
+    history = impacts.sort_values("Start Date", ascending=False)
     cohort_id = member.get("cohort_id", config.default_cohort().id)
     checkpoint_progress = []
     for cp in config.sorted_checkpoints():
@@ -374,7 +385,7 @@ def get_member_profile(email: str) -> dict:
                 "event_name": safe_text(row["Event Name"]),
                 "hours": round(float(row["Hours Served"]), 2),
                 "verified": safe_text(row["Verified"]),
-                "reflection": safe_text(row["Review/Reflection"]),
+                "reflection": reflection_text(row, config),
             }
             for _, row in history.iterrows()
         ],
@@ -416,6 +427,7 @@ def get_member_activity(email: str) -> list[dict]:
 
 
 def get_member_impacts(email: str) -> list[dict]:
+    config = get_config()
     email = email.lower().strip()
     impacts = STATE.impacts_df[STATE.impacts_df["email"] == email].copy().sort_values("Start Date", ascending=False)
     return [
@@ -426,7 +438,7 @@ def get_member_impacts(email: str) -> list[dict]:
             "event_name": safe_text(row.get("Event Name")),
             "hours": round(float(row.get("Hours Served", 0)), 2),
             "verified": safe_text(row.get("Verified")),
-            "reflection": safe_text(row.get("Review/Reflection")),
+            "reflection": reflection_text(row, config),
         }
         for _, row in impacts.iterrows()
     ]

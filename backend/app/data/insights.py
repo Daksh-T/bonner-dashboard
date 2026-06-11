@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import pandas as pd
 
+from ..settings import get_config
 from .loader import STATE
-from .processor import get_effective_reference_date
+from .processor import get_effective_reference_date, reflection_text
 
 
 def _reference_window(days: int) -> tuple[pd.Timestamp, pd.Timestamp]:
@@ -129,7 +130,7 @@ def get_overview_drilldown(kind: str, class_name: str | None = None) -> dict:
                 "hours": round(float(row.get("Hours Served", 0) or 0), 2),
                 "verified": "" if pd.isna(row.get("Verified")) else str(row.get("Verified")).strip(),
                 "organizer": "" if pd.isna(row.get("Organizer")) else str(row.get("Organizer")).strip(),
-                "reflection": "" if pd.isna(row.get("Review/Reflection")) else str(row.get("Review/Reflection")).strip(),
+                "reflection": reflection_text(row, get_config()),
             }
             for _, row in recent.sort_values(["Start Date", "Hours Served"], ascending=[False, False]).iterrows()
         ]

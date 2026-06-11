@@ -6,6 +6,7 @@ import pandas as pd
 
 from ..settings import get_config
 from .loader import STATE
+from .processor import reflection_text
 
 
 def _clean_text(value: object) -> str:
@@ -91,7 +92,9 @@ def get_pending_partner_detail(partner: str) -> dict:
         return {"partner": partner, "summary": {}, "weekly": [], "impacts": []}
 
     subset["member_name"] = subset["email"].map(members).fillna(subset["email"])
-    subset["is_blank_reflection"] = subset["Review/Reflection"].map(_is_blank_reflection)
+    config = get_config()
+    subset["reflection_text"] = subset.apply(lambda row: reflection_text(row, config), axis=1)
+    subset["is_blank_reflection"] = subset["reflection_text"].map(_is_blank_reflection)
     subset["week_start"] = subset["Start Date"].dt.to_period("W").dt.start_time
 
     weekly = (
@@ -117,7 +120,7 @@ def get_pending_partner_detail(partner: str) -> dict:
             "hours": round(float(row.get("Hours Served", 0) or 0), 2),
             "verified": _clean_text(row.get("Verified")),
             "organizer": _clean_text(row.get("Organizer")),
-            "reflection": _clean_text(row.get("Review/Reflection")),
+            "reflection": _clean_text(row.get("reflection_text")),
             "is_blank_reflection": bool(row.get("is_blank_reflection")),
         }
         for _, row in subset.sort_values(["Start Date", "member_name"], ascending=[False, True]).iterrows()
