@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* ---- Theme tokens (dark default) -------------------------------------- */
+:root {
+  color-scheme: dark;
+  --bg:          #09090b;
+  --bg-1:        #0d0d0f;
+  --surface:     #111113;
+  --surface-2:   #0e0e10;
+  --surface-3:   #18181b;
+  --row-alt:     #0f0f11;
+  --border:      #1f1f23;
+  --border-2:    #1c1c1f;
+  --border-3:    #27272a;
+  --text:        #fafafa;
+  --text-bright: #d4d4d8;
+  --text-2:      #a1a1aa;
+  --text-3:      #71717a;
+  --text-muted:  #52525b;
+  --text-faint:  #3f3f46;
+  --hover:       rgba(255,255,255,0.06);
+  --scrollbar:   #27272a;
+  --scrollbar-hover: #3f3f46;
+  --overlay:     rgba(0,0,0,0.6);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  /* Warm, paper-like light theme (cream/beige rather than stark white). */
+  --bg:          #f3efe7;
+  --bg-1:        #fdfbf6;
+  --surface:     #fbf8f1;
+  --surface-2:   #f4efe4;
+  --surface-3:   #ece5d6;
+  --row-alt:     #f7f3ea;
+  --border:      #e7dfd0;
+  --border-2:    #ebe3d4;
+  --border-3:    #d9cfbb;
+  --text:        #2a2620;
+  --text-bright: #3a342c;
+  --text-2:      #565047;
+  --text-3:      #6e6658;
+  --text-muted:  #8a8172;
+  --text-faint:  #b1a691;
+  --hover:       rgba(90,70,30,0.07);
+  --scrollbar:   #d9cfbb;
+  --scrollbar-hover: #b1a691;
+  --overlay:     rgba(40,34,26,0.34);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+:focus-visible { outline: 2px solid rgba(52,152,219,0.6); outline-offset: 2px; border-radius: 4px; }
+
+/* Screen-reader-only utility (visible when focused, e.g. the skip link). */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #3498db;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  transform: translateY(-150%);
+  transition: transform 0.15s ease-out;
+}
+.skip-link:focus { transform: translateY(0); }
+
+input:not([type="checkbox"]):not([type="radio"]), textarea, select {
+  background: var(--surface);
+  border: 1px solid var(--border-3);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 11px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  width: 100%;
+  appearance: none;
+}
+
+/* Native checkboxes/radios keep their appearance but pick up the accent color. */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: #3498db;
+  cursor: pointer;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: rgba(52,152,219,0.5);
+  box-shadow: 0 0 0 3px rgba(52,152,219,0.08);
+}
+input::placeholder, textarea::placeholder { color: var(--text-faint); }
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath stroke='%2371717a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 16px;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes slide-out {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+@keyframes dialog-scale-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes dialog-scale-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(10px) scale(0.985); }
+}
+@keyframes pulse-soft {
+  0%,100% { opacity: 1; }
+  50%     { opacity: 0.4; }
+}
+
+.animate-fade-up  { animation: fade-up  0.2s  ease-out                    both; }
+.animate-slide-in { animation: slide-in 0.22s cubic-bezier(0.16,1,0.3,1) both; }
+.animate-slide-out { animation: slide-out 0.18s cubic-bezier(0.7,0,0.84,0) both; }
+.animate-fade-in  { animation: fade-in  0.15s ease-out                    both; }
+.animate-fade-out { animation: fade-out 0.18s ease-out                    both; }
+.animate-pulse-soft { animation: pulse-soft 1.8s ease-in-out infinite; }
+
+.dialog-overlay-open { animation: fade-in 0.16s ease-out both; }
+.dialog-overlay-close { animation: fade-out 0.18s ease-out both; }
+.dialog-content-open { animation: dialog-scale-in 0.2s cubic-bezier(0.16,1,0.3,1) both; }
+.dialog-content-close { animation: dialog-scale-out 0.18s ease-in both; }

@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: bonner-dashboard-demo
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health

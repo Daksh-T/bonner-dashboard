@@ -1,0 +1,20 @@
+backend/.venv/
+backend/bonner.db
+backend/.bonner_secret_key
+backend/uploads/
+backend/dist/
+backend/build/
+backend/__pycache__/
+backend/app/**/__pycache__/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.tmp/
+frontend/tsconfig.tsbuildinfo
+.DS_Store
+.env
+
+# misc
+.claude/
+nohup.out
+backend/.coverage

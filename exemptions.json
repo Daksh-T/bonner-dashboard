@@ -1,0 +1,14 @@
+{
+  "exemptions": [
+    {
+      "email": "priya.nair@example.edu",
+      "name": "Priya Nair",
+      "reason": "Demo spring exemption"
+    },
+    {
+      "email": "grace.taylor@example.edu",
+      "name": "Grace Taylor",
+      "reason": "Demo spring exemption"
+    }
+  ]
+}
