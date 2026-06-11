@@ -152,7 +152,9 @@ function ExportUpload({
   setBusy: (s: string | null) => void;
   busy: string | null;
 }) {
+  const [dragOver, setDragOver] = useState<string | null>(null);
   const upload = async (kind: "users" | "impacts", file: File) => {
+    if (!file.name.toLowerCase().endsWith(".csv")) return;
     setBusy(kind);
     try {
       await api.uploadCsv(kind, file);
@@ -191,7 +193,13 @@ function ExportUpload({
       <div className="mt-4 grid grid-cols-2 gap-3">
         {(["users", "impacts"] as const).map((kind) => (
           <label key={kind} className="flex cursor-pointer flex-col items-center gap-2 rounded-xl p-5 text-center"
-            style={{ border: `1px dashed ${uploaded[kind] ? "#27ae6066" : "var(--border-3)"}`, background: "var(--surface-2)" }}>
+            style={{
+              border: `1px dashed ${dragOver === kind ? "#3498db" : uploaded[kind] ? "#27ae6066" : "var(--border-3)"}`,
+              background: dragOver === kind ? "#3498db14" : "var(--surface-2)",
+            }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(kind); }}
+            onDragLeave={() => setDragOver((d) => (d === kind ? null : d))}
+            onDrop={(e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files?.[0]; if (f) upload(kind, f); }}>
             {busy === kind ? <Loader2 size={18} className="animate-spin" style={{ color: ACCENT }} />
               : uploaded[kind] ? <Check size={18} style={{ color: "#27ae60" }} />
               : <Upload size={18} style={{ color: "var(--text-muted)" }} />}

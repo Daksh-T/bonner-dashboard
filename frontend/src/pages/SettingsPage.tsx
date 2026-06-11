@@ -137,9 +137,7 @@ export function SettingsPage({
 
       {!config && <div className="text-[13px]" style={SUBTLE}>Loading configuration…</div>}
 
-      {config && tab === "data" && (
-        <DataSourceSection config={config} onDataStatusChange={onDataStatusChange} />
-      )}
+      {config && tab === "data" && <DataSourceSection onDataStatusChange={onDataStatusChange} />}
       {config && tab === "checkpoints" && <CheckpointsSection config={config} saveConfig={saveConfig} />}
       {config && tab === "reflections" && <ReflectionsSection config={config} saveConfig={saveConfig} />}
       {config && tab === "roster" && <RosterSection config={config} saveConfig={saveConfig} loaded={!!dataStatus?.loaded} />}
@@ -159,22 +157,25 @@ export function SettingsPage({
 // --------------------------------------------------------------------------- //
 // Data (CSV upload)
 // --------------------------------------------------------------------------- //
-function DataSourceSection({
-  config,
-  onDataStatusChange,
-}: {
-  config: AppConfig;
-  onDataStatusChange: (status: DataStatus) => void;
-}) {
+function DataSourceSection({ onDataStatusChange }: { onDataStatusChange: (status: DataStatus) => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState<{ users?: string; impacts?: string }>({});
+  const [dragOver, setDragOver] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const uploadFile = async (kind: "users" | "impacts", file: File) => {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setUploadError(`"${file.name}" is not a .csv file.`);
+      return;
+    }
     setBusy(kind);
+    setUploadError(null);
     try {
       const res = await api.uploadCsv(kind, file);
       setDone((d) => ({ ...d, [kind]: res.filename }));
       onDataStatusChange(await api.reloadData());
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
     }
@@ -204,8 +205,19 @@ function DataSourceSection({
           {(["users", "impacts"] as const).map((kind) => (
             <label
               key={kind}
-              className="flex cursor-pointer flex-col items-center gap-2 rounded-xl p-6 text-center"
-              style={{ border: `1px dashed ${done[kind] ? "#27ae6066" : "var(--border-3)"}`, background: "var(--surface-2)" }}
+              className="flex cursor-pointer flex-col items-center gap-2 rounded-xl p-6 text-center transition-colors"
+              style={{
+                border: `1px dashed ${dragOver === kind ? "#3498db" : done[kind] ? "#27ae6066" : "var(--border-3)"}`,
+                background: dragOver === kind ? "#3498db14" : "var(--surface-2)",
+              }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(kind); }}
+              onDragLeave={() => setDragOver((d) => (d === kind ? null : d))}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(null);
+                const f = e.dataTransfer.files?.[0];
+                if (f) uploadFile(kind, f);
+              }}
             >
               {busy === kind ? <Loader2 size={18} className="animate-spin" style={{ color: "#3498db" }} />
                 : done[kind] ? <Check size={18} style={{ color: "#27ae60" }} />
@@ -213,14 +225,17 @@ function DataSourceSection({
               <span className="text-[12px] font-medium" style={{ color: "var(--text-2)" }}>
                 {done[kind] ? `${kind} uploaded ✓` : kind === "users" ? "users-*.csv (roster)" : "impacts-*.csv (hours)"}
               </span>
+              <span className="text-[11px]" style={SUBTLE}>Click to browse or drag & drop</span>
               <input type="file" accept=".csv" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(kind, f); e.target.value = ""; }} />
             </label>
           ))}
         </div>
+        {uploadError && (
+          <p className="mt-3 text-[12px]" style={{ color: "#e74c3c" }}>Upload failed: {uploadError}</p>
+        )}
         <p className="mt-3 text-[11px]" style={SUBTLE}>
           Files are stored locally and reused until you upload newer ones. The newest upload of each kind is used automatically.
-          {config.data_source === "csv" ? "" : ""}
         </p>
       </Card>
     </div>
