@@ -50,7 +50,8 @@ jobs:
         with:
           bun-version: latest
 
-      - uses: astral-sh/setup-uv@v8
+      # Pinned to an exact tag: astral-sh publishes no floating v8 major tag.
+      - uses: astral-sh/setup-uv@v8.2.0
         with:
           enable-cache: true
 
