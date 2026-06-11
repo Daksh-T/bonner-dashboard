@@ -1,6 +1,6 @@
-# Bonner Hour Dashboard
+# Bonner Dashboard
 
-Checkpoint dashboard for Bonner-style service programs: hour progress, risk
+Checkpoint dashboard for Bonner service programs: hour progress, risk
 status, partner activity, reflection completion, exemptions, exports, and
 Slack-ready outreach messages. Runs entirely on your **GivePulse CSV exports**
 — locally, with nothing leaving your machine. A first-run wizard walks you
