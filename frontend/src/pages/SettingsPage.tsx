@@ -4,18 +4,21 @@ import { api } from "../api/client";
 import { useAsyncData } from "../hooks/useDashboardData";
 import { applyTheme } from "../lib/theme";
 import { exportSettingsFile } from "../lib/settingsFile";
-import type { AppConfig, Cohort, DataStatus } from "../types";
+import { STATUS_COLORS } from "../lib/constants";
+import { TemplateEditor, type CheckpointExample, type TemplateEditorHandle, type TemplateToken } from "../components/ui/TemplateEditor";
+import type { AppConfig, Cohort, DataStatus, Status } from "../types";
 
 type ExemptionRow = { email: string; name: string; reason: string; created_at: string };
 type MemberOption = { email: string; display_name: string; status: string };
 
-type Tab = "data" | "checkpoints" | "reflections" | "roster" | "exemptions" | "appearance" | "help";
+type Tab = "data" | "checkpoints" | "reflections" | "roster" | "messages" | "exemptions" | "appearance" | "help";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "data", label: "Data" },
   { id: "checkpoints", label: "Checkpoints & cohorts" },
   { id: "reflections", label: "Reflections" },
   { id: "roster", label: "Roster export" },
+  { id: "messages", label: "Messages" },
   { id: "exemptions", label: "Exemptions" },
   { id: "appearance", label: "Appearance" },
   { id: "help", label: "Help" },
@@ -141,6 +144,7 @@ export function SettingsPage({
       {config && tab === "checkpoints" && <CheckpointsSection config={config} saveConfig={saveConfig} />}
       {config && tab === "reflections" && <ReflectionsSection config={config} saveConfig={saveConfig} />}
       {config && tab === "roster" && <RosterSection config={config} saveConfig={saveConfig} loaded={!!dataStatus?.loaded} />}
+      {config && tab === "messages" && <MessagesSection config={config} saveConfig={saveConfig} />}
       {tab === "exemptions" && <ExemptionsSection dataStatus={dataStatus} onDataStatusChange={onDataStatusChange} />}
       {config && tab === "appearance" && (
         <AppearanceSection config={config} saveConfig={saveConfig} setConfig={setConfig} onDataStatusChange={onDataStatusChange} onConfigChange={onConfigChange} />
@@ -880,6 +884,185 @@ function RosterSection({ config, saveConfig, loaded }: { config: AppConfig; save
           )}
         </Card>
       )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------- //
+// Messages (per-status outreach templates)
+// --------------------------------------------------------------------------- //
+const ORDINALS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"];
+const ORDINAL_WORDS = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+
+const MESSAGE_STATUSES: Status[] = ["Red", "Blue", "Yellow", "Green"];
+
+function formatRunDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function MessagesSection({ config, saveConfig }: { config: AppConfig; saveConfig: (p: Partial<AppConfig>) => Promise<unknown> }) {
+  const defaults = useAsyncData(() => api.getTemplateDefaults(), [], true);
+  const [drafts, setDrafts] = useState<Record<string, string>>(config.message_templates ?? {});
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  const dirty = JSON.stringify(drafts) !== JSON.stringify(config.message_templates ?? {});
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await saveConfig({ message_templates: drafts });
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1800);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetOne = (status: Status) => {
+    const def = defaults.data?.templates?.[status];
+    if (def === undefined) return;
+    setDrafts((d) => ({ ...d, [status]: def }));
+  };
+
+  // Determine the active checkpoint: first upcoming (date >= today), else the first checkpoint.
+  const sortedCheckpoints = useMemo(
+    () => [...config.checkpoints].sort((a, b) => a.date.localeCompare(b.date)),
+    [config.checkpoints],
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  const activeIndex = useMemo(() => {
+    const idx = sortedCheckpoints.findIndex((cp) => cp.date >= today);
+    return idx === -1 ? Math.max(sortedCheckpoints.length - 1, 0) : idx;
+  }, [sortedCheckpoints, today]);
+  const activeCheckpoint = sortedCheckpoints[activeIndex];
+
+  // Default cohort for the goal example.
+  const defaultCohort = config.cohorts.find((c) => c.is_default) ?? config.cohorts[0];
+  const goalValue = activeCheckpoint ? (activeCheckpoint.requirements[defaultCohort?.id ?? ""] ?? Object.values(activeCheckpoint.requirements)[0] ?? 0) : 0;
+  const hoursValue = Math.round(goalValue * 0.6 * 10) / 10;
+
+  const checkpointExample: CheckpointExample = {
+    ordinal: ORDINALS[activeIndex] ?? `${activeIndex + 1}th`,
+    ordinal_word: ORDINAL_WORDS[activeIndex] ?? `${activeIndex + 1}th`,
+    checkpoint_number: String(activeIndex + 1),
+    checkpoint_name: activeCheckpoint?.name ?? "—",
+  };
+
+  const exampleValues: Record<TemplateToken, string> = {
+    hours: hoursValue.toFixed(1),
+    goal: goalValue % 1 === 0 ? String(goalValue) : goalValue.toFixed(1),
+    run_date: activeCheckpoint ? formatRunDate(activeCheckpoint.date) : "—",
+    ordinal: checkpointExample.ordinal,
+    ordinal_word: checkpointExample.ordinal_word,
+    checkpoint_number: checkpointExample.checkpoint_number,
+    checkpoint_name: checkpointExample.checkpoint_name,
+  };
+
+  const renderPreview = (template: string) =>
+    template.replace(/\{(\w+)\}/g, (full, token) => (token in exampleValues ? exampleValues[token as TemplateToken] : full));
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <p className="text-[12px]" style={SUBTLE}>
+          These are the draft messages used on the Communication Prep page. Variables (shown as colored pills) are
+          filled in per member when the outreach queue is built — click a variable in the toolbar below an editor
+          to insert it, and click the amber checkpoint-language pills to switch between phrasings.
+        </p>
+      </Card>
+
+      {MESSAGE_STATUSES.map((status) => (
+        <MessageStatusCard
+          key={status}
+          status={status}
+          value={drafts[status] ?? ""}
+          onChange={(v) => setDrafts((d) => ({ ...d, [status]: v }))}
+          onReset={() => resetOne(status)}
+          variables={defaults.data?.variables ?? []}
+          checkpointExample={checkpointExample}
+          preview={renderPreview(drafts[status] ?? "")}
+        />
+      ))}
+
+      <div className="flex items-center gap-3">
+        <PrimaryButton onClick={save} disabled={saving || !dirty}>{saving ? "Saving…" : "Save messages"}</PrimaryButton>
+        {savedFlash && (
+          <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "#27ae60" }}>
+            <Check size={14} /> Saved
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MessageStatusCard({
+  status,
+  value,
+  onChange,
+  onReset,
+  variables,
+  checkpointExample,
+  preview,
+}: {
+  status: Status;
+  value: string;
+  onChange: (v: string) => void;
+  onReset: () => void;
+  variables: Array<{ token: string; label: string; description: string; example: string }>;
+  checkpointExample: CheckpointExample;
+  preview: string;
+}) {
+  const editorRef = useRef<TemplateEditorHandle>(null);
+  const color = STATUS_COLORS[status];
+
+  return (
+    <div className="rounded-xl p-5" style={CARD}>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+          <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{status}</span>
+        </div>
+        <button type="button" onClick={onReset} className="text-[11px] font-medium underline" style={{ color: "var(--text-muted)" }}>
+          Reset to default
+        </button>
+      </div>
+
+      <TemplateEditor ref={editorRef} value={value} onChange={onChange} checkpointExample={checkpointExample} />
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {variables.map((v) => {
+          const tokenColor = v.token === "hours" ? "#27ae60"
+            : v.token === "goal" ? "#3498db"
+            : v.token === "run_date" ? "#9b59b6"
+            : "#e67e22";
+          return (
+            <button
+              key={v.token}
+              type="button"
+              title={v.description}
+              onClick={() => editorRef.current?.insertToken(v.token as TemplateToken)}
+              className="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
+              style={{ background: `${tokenColor}18`, color: tokenColor, border: `1px solid ${tokenColor}40` }}
+            >
+              + {v.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-3">
+        <div className={LABEL} style={{ color: "var(--text-faint)" }}>Preview</div>
+        <div
+          className="rounded-lg p-3 text-[12px]"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-2)", whiteSpace: "pre-wrap" }}
+        >
+          {preview || <span style={{ color: "var(--text-faint)" }}>—</span>}
+        </div>
+      </div>
     </div>
   );
 }

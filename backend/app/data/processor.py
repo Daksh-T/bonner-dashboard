@@ -9,9 +9,12 @@ from .. import db
 from ..settings import (
     AppConfig,
     RuntimeCheckpoint,
+    checkpoint_number,
     checkpoint_ordinal,
+    checkpoint_ordinal_word,
     default_checkpoint_name,
     get_config,
+    render_template,
     resolve_checkpoint,
 )
 from .loader import STATE
@@ -161,11 +164,17 @@ def build_checkpoint_message(status: str, hours: float, checkpoint: RuntimeCheck
     template = config.message_templates.get(status, "")
     if not template:
         return ""
-    return template.format(
-        ordinal=checkpoint_ordinal(checkpoint.name, config),
-        run_date=checkpoint.date.strftime("%B %-d, %Y"),
-        goal=format_hours(goal_hours),
-        hours=format_hours(hours),
+    return render_template(
+        template,
+        {
+            "ordinal": checkpoint_ordinal(checkpoint.name, config),
+            "ordinal_word": checkpoint_ordinal_word(checkpoint.name, config),
+            "checkpoint_number": checkpoint_number(checkpoint.name, config),
+            "checkpoint_name": checkpoint.name,
+            "run_date": checkpoint.date.strftime("%B %-d, %Y"),
+            "goal": format_hours(goal_hours),
+            "hours": format_hours(hours),
+        },
     )
 
 
