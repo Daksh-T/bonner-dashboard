@@ -17,17 +17,6 @@ The bundled `csv/*-demo-*.csv`, `exemptions.json`, and `support_tracking.json`
 contain fabricated demo records only; they're cleared automatically when you
 upload your own CSVs.
 
-## Recent updates
-
-- **Drag & drop CSV upload** in Settings → Data and the onboarding wizard,
-  with inline error reporting when a load fails.
-- **Demo data cleanup** — demo exemptions/outreach rows are removed as soon as
-  you upload real CSVs, and never re-seeded.
-- **Robust CSV handling** — exports with missing/renamed columns or no rows in
-  the program window no longer crash the load; the reflection/graduation-year
-  field pickers always show the columns of the CSVs currently in use.
-- Dead code removed; CORS tightened.
-
 ## Run it locally
 
 ### Prerequisites
@@ -96,10 +85,10 @@ Linux). Override with `BONNER_DATA_DIR`; other path overrides:
 `BONNER_CSV_DIR`, `BONNER_UPLOAD_DIR`, `BONNER_EXEMPTIONS_PATH`,
 `BONNER_SUPPORT_SEED_PATH`, `BONNER_FRONTEND_DIST_PATH`.
 
-> **Back up before updating.** Copy the app-data dir above (or at minimum
-> export your settings from **Settings → Appearance → Portable settings**)
-> before installing a new version, so you can restore your configuration and
-> CSVs if anything looks wrong after the update.
+> **Back up before updating.** Copy the app-data dir above (or export
+> your settings from **Settings → Appearance → Portable settings**)
+> before installing a new version, so you can restore your configuration
+> and CSVs if anything looks wrong after the update.
 
 ## Using it as a web app
 
