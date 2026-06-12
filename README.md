@@ -96,6 +96,11 @@ Linux). Override with `BONNER_DATA_DIR`; other path overrides:
 `BONNER_CSV_DIR`, `BONNER_UPLOAD_DIR`, `BONNER_EXEMPTIONS_PATH`,
 `BONNER_SUPPORT_SEED_PATH`, `BONNER_FRONTEND_DIST_PATH`.
 
+> **Back up before updating.** Copy the app-data dir above (or at minimum
+> export your settings from **Settings → Appearance → Portable settings**)
+> before installing a new version, so you can restore your configuration and
+> CSVs if anything looks wrong after the update.
+
 ## Using it as a web app
 
 The same codebase runs as a single-origin web service: the `Dockerfile`

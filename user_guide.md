@@ -236,6 +236,15 @@ Everything is local:
 To migrate machines: export settings from **Settings → Appearance**, copy your
 two newest CSVs, and import on the new machine.
 
+### Back up before updating
+
+Before installing a new version, copy the data dir from the table above to
+somewhere safe (or at minimum export your settings from **Settings →
+Appearance → Portable settings**). Updates are designed to leave your data
+untouched, but a backup means you can always restore your configuration,
+roster, and uploaded CSVs by copying the folder back (or re-importing the
+settings JSON).
+
 ## Troubleshooting
 
 - **"Missing export files" / no data** — upload both a users and an impacts
@@ -248,5 +257,10 @@ two newest CSVs, and import on the new machine.
   senior picker if the export has no usable year.
 - **A name won't match the roster export** — edit the pasted name to match
   the member's display name shown on the Members page.
+- **Demo data showing after an update** — older versions could pick the
+  bundled demo CSVs over your uploads after an install/update (the freshly
+  installed demo files looked "newer"). This is fixed — uploads now always
+  win — and your real CSVs were never deleted: they're in the data dir's
+  `uploads/` folder, so reloading (or re-uploading) brings them back.
 - **Start over** — delete the data dir (table above) and relaunch; the wizard
   runs again. Demo data reappears only on a truly fresh install.
