@@ -355,7 +355,7 @@ function NotesEditor({ value, onSave, onClose }: { value: string; onSave: (n: st
         rows={2}
         placeholder="Notes…"
         style={{ fontSize: 11, padding: "6px 8px", resize: "none" }}
-        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === "Escape") onClose(); }}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === "Escape") { e.preventDefault(); onClose(); } }}
       />
       <div className="flex gap-1.5">
         <button

@@ -100,6 +100,10 @@ export const api = {
     }),
   completeOnboarding: () =>
     request<{ onboarding_complete: boolean }>("/api/config/onboarding-complete", { method: "POST" }),
+  getTemplateDefaults: () =>
+    request<{ templates: Record<string, string>; variables: Array<{ token: string; label: string; description: string; example: string }> }>(
+      "/api/config/template-defaults",
+    ),
 
   // ---- roster export ----
   getRosterStatus: () =>

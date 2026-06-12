@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
 
-from ..settings import AppConfig, default_config, get_config, save_config
+from ..settings import AppConfig, DEFAULT_MESSAGE_TEMPLATES, TEMPLATE_VARIABLES, default_config, get_config, save_config
 from ..data.loader import STATE
 from ..data.processor import data_status, load_dashboard_data
 
@@ -18,6 +18,11 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 @router.get("")
 def read_config():
     return get_config().model_dump(mode="json")
+
+
+@router.get("/template-defaults")
+def template_defaults():
+    return {"templates": DEFAULT_MESSAGE_TEMPLATES, "variables": TEMPLATE_VARIABLES}
 
 
 @router.put("")
