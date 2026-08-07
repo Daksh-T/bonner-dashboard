@@ -6,7 +6,7 @@ import { applyTheme } from "../lib/theme";
 import { exportSettingsFile } from "../lib/settingsFile";
 import { STATUS_COLORS } from "../lib/constants";
 import { TemplateEditor, type CheckpointExample, type TemplateEditorHandle, type TemplateToken } from "../components/ui/TemplateEditor";
-import type { AppConfig, Cohort, DataStatus, Status } from "../types";
+import type { AppConfig, BreakPeriod, Cohort, DataStatus, Status } from "../types";
 
 type ExemptionRow = { email: string; name: string; reason: string; created_at: string };
 type MemberOption = { email: string; display_name: string; status: string };
@@ -19,7 +19,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "reflections", label: "Reflections" },
   { id: "roster", label: "Roster export" },
   { id: "messages", label: "Messages" },
-  { id: "exemptions", label: "Exemptions" },
+  { id: "exemptions", label: "Long-term exemptions" },
   { id: "appearance", label: "Appearance" },
   { id: "help", label: "Help" },
 ];
@@ -363,6 +363,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function CheckpointsSection({ config, saveConfig }: { config: AppConfig; saveConfig: (p: Partial<AppConfig>) => Promise<unknown> }) {
   const [programName, setProgramName] = useState(config.program_name);
   const [programStart, setProgramStart] = useState(config.program_start);
+  const [includeFullStartMonthImpacts, setIncludeFullStartMonthImpacts] = useState(config.include_full_start_month_impacts ?? false);
+  const [breakPeriods, setBreakPeriods] = useState<BreakPeriod[]>(config.break_periods ?? []);
   const [cohorts, setCohorts] = useState<Cohort[]>(config.cohorts);
   const [checkpoints, setCheckpoints] = useState(config.checkpoints);
   const [classLabels, setClassLabels] = useState<Record<string, string>>(config.class_labels);
@@ -398,6 +400,13 @@ function CheckpointsSection({ config, saveConfig }: { config: AppConfig; saveCon
     setCheckpoints([...checkpoints, { name: `CP${checkpoints.length + 1}`, date: config.program_start, requirements: reqs }]);
   };
   const removeCheckpoint = (i: number) => setCheckpoints(checkpoints.filter((_, idx) => idx !== i));
+  const setBreakPeriod = (i: number, patch: Partial<BreakPeriod>) =>
+    setBreakPeriods((periods) => periods.map((period, idx) => (idx === i ? { ...period, ...patch } : period)));
+  const addBreakPeriod = () => setBreakPeriods([
+    ...breakPeriods,
+    { label: "Break", start: programStart, end: programStart },
+  ]);
+  const removeBreakPeriod = (i: number) => setBreakPeriods((periods) => periods.filter((_, idx) => idx !== i));
 
   const save = async () => {
     setSaving(true);
@@ -405,6 +414,8 @@ function CheckpointsSection({ config, saveConfig }: { config: AppConfig; saveCon
       await saveConfig({
         program_name: programName,
         program_start: programStart,
+        include_full_start_month_impacts: includeFullStartMonthImpacts,
+        break_periods: breakPeriods,
         cohorts,
         checkpoints,
         class_labels: classLabels,
@@ -425,9 +436,45 @@ function CheckpointsSection({ config, saveConfig }: { config: AppConfig; saveCon
           <Field label="Program name"><input value={programName} onChange={(e) => setProgramName(e.target.value)} /></Field>
           <Field label="Program start"><input type="date" value={programStart} onChange={(e) => setProgramStart(e.target.value)} /></Field>
         </div>
+        <label className="mt-4 flex min-h-11 cursor-pointer items-start gap-3 rounded-lg px-3 py-2.5" style={{ background: "var(--surface-2)" }}>
+          <input
+            type="checkbox"
+            checked={includeFullStartMonthImpacts}
+            onChange={(event) => setIncludeFullStartMonthImpacts(event.target.checked)}
+            style={{ width: 17, height: 17, marginTop: 2, flexShrink: 0 }}
+          />
+          <span>
+            <span className="block text-[12px] font-medium" style={{ color: "var(--text-2)" }}>Count all impacts from the program start month</span>
+            <span className="mt-0.5 block text-pretty text-[11px]" style={SUBTLE}>
+              Useful for fall: if Program start is in August, impacts from August 1 onward count toward totals and checkpoints. Pre-start weeks do not become expected service weeks.
+            </span>
+          </span>
+        </label>
         <p className="mt-3 text-[11px]" style={SUBTLE}>
           The last checkpoint's date is your program end. "Today's pace" is interpolated between the program start and your checkpoints.
         </p>
+      </Card>
+
+      <Card title="Breaks and limited-service periods">
+        <p className="mb-3 text-[11px]" style={SUBTLE}>
+          Add program-wide periods such as spring break, winter break, or finals. Any Monday–Sunday week touched by a period is removed from pace expectations, projections, and rhythm checks. Service recorded during the period still counts toward totals and checkpoints.
+        </p>
+        <div className="space-y-2">
+          {breakPeriods.map((period, i) => (
+            <div key={`${i}-${period.start}`} className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_150px_150px_auto]">
+              <input value={period.label} onChange={(e) => setBreakPeriod(i, { label: e.target.value })} placeholder="Spring break" />
+              <input type="date" value={period.start} onChange={(e) => setBreakPeriod(i, { start: e.target.value })} aria-label={`${period.label} start`} />
+              <input type="date" value={period.end} onChange={(e) => setBreakPeriod(i, { end: e.target.value })} aria-label={`${period.label} end`} />
+              <button onClick={() => removeBreakPeriod(i)} className="min-h-10 rounded-lg p-2" style={{ background: "#e74c3c14", color: "#e74c3c" }} aria-label={`Remove ${period.label}`}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+          {breakPeriods.length === 0 && (
+            <div className="py-3 text-[12px]" style={{ color: "var(--text-faint)" }}>Every program week is currently eligible.</div>
+          )}
+        </div>
+        <GhostButton onClick={addBreakPeriod} className="mt-3"><span className="flex items-center gap-1"><Plus size={13} /> Add break period</span></GhostButton>
       </Card>
 
       <Card title="Cohorts (requirement tiers)">
@@ -953,7 +1000,15 @@ function MessagesSection({ config, saveConfig }: { config: AppConfig; saveConfig
 
   const exampleValues: Record<TemplateToken, string> = {
     hours: hoursValue.toFixed(1),
+    approved_hours: hoursValue.toFixed(1),
     goal: goalValue % 1 === 0 ? String(goalValue) : goalValue.toFixed(1),
+    recent_avg: "6.5",
+    recent_weeks: "3",
+    pace_needed: "10.14",
+    remaining_service_weeks: "7",
+    final_goal: "133",
+    final_hours_needed: "71",
+    projected_final_hours: "118.5",
     run_date: activeCheckpoint ? formatRunDate(activeCheckpoint.date) : "—",
     ordinal: checkpointExample.ordinal,
     ordinal_word: checkpointExample.ordinal_word,
@@ -1123,7 +1178,8 @@ function ExemptionsSection({
 
   return (
     <div className="space-y-5">
-      <Card title="Add exemption">
+      <Card title="Add long-term exemption">
+        <p className="mb-3 text-[11px]" style={SUBTLE}>Use the Follow-up queue's Snooze control for temporary context and a review date. This list is for program-wide requirement exceptions.</p>
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3">
           <select value={selectedEmail} onChange={(e) => setSelectedEmail(e.target.value)}>
             <option value="">Select a member…</option>

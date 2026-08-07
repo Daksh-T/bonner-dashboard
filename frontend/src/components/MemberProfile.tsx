@@ -23,12 +23,21 @@ export function MemberProfile({
 }) {
   const [selectedImpact, setSelectedImpact] = useState<R | null>(null);
   const [closing, setClosing] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
   const profile = useAsyncData(() => api.getMemberProfile(email), [email, activeCheckpoint], true);
   const activity = useAsyncData(
     () => fetch(`/api/members/${encodeURIComponent(email)}/activity`).then((r) => r.json()) as Promise<R[]>,
     [email, activeCheckpoint],
     true,
   );
+  const p = profile.data as R | null;
+
+  useEffect(() => {
+    setNoteDraft(String(p?.notes ?? ""));
+    setNoteSaved(false);
+  }, [email, p?.notes]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -52,10 +61,24 @@ export function MemberProfile({
 
   const dismiss = () => setClosing(true);
 
-  const p      = profile.data as R | null;
   const status = ((p?.status ?? "Exempt") as Status);
   const color  = STATUS_COLORS[status];
   const pct    = Math.min(100, Number(p?.progress_pct ?? 0));
+  const paceLabel = String(p?.pace_label ?? "");
+  const paceColor = paceLabel === "Behind pace" ? "#f39c12" : paceLabel === "Near pace" ? "#3498db" : "#27ae60";
+
+  const saveNote = async () => {
+    if (!p?.email) return;
+    setNoteSaving(true);
+    setNoteSaved(false);
+    try {
+      await api.updateSupport(String(p.email), Boolean(p.outreach_sent), noteDraft);
+      profile.setData({ ...p, notes: noteDraft });
+      setNoteSaved(true);
+    } finally {
+      setNoteSaving(false);
+    }
+  };
 
   return (
     <>
@@ -85,6 +108,14 @@ export function MemberProfile({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {!!paceLabel && (
+                <span
+                  className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                  style={{ background: `${paceColor}1a`, color: paceColor }}
+                >
+                  {paceLabel}
+                </span>
+              )}
               {!!p?.status && (
                 <span
                   className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
@@ -133,8 +164,8 @@ export function MemberProfile({
               <div className="grid grid-cols-4 gap-2">
                 {[
                   { label: "Hours",       val: Number(p.hours).toFixed(1) },
-                  { label: "Active wks",  val: String(p.active_weeks ?? "—") },
-                  { label: "Avg / wk",    val: `${Number(p.avg_week ?? 0).toFixed(1)}` },
+                  { label: "Weeks served", val: String(p.active_weeks ?? "—") },
+                  { label: "Eligible avg", val: `${Number(p.avg_week ?? 0).toFixed(1)}` },
                   { label: "Need / wk",   val: Number(p.pace_needed ?? 0) > 0 ? Number(p.pace_needed).toFixed(1) : "—" },
                 ].map(({ label, val }) => (
                   <div key={label} className="rounded-lg p-2.5 text-center" style={{ background: "var(--surface-3)", border: "1px solid var(--border)" }}>
@@ -142,6 +173,30 @@ export function MemberProfile({
                     <div className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>{label}</div>
                   </div>
                 ))}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <SectionLabel>Program lead notes</SectionLabel>
+                  {noteSaved && <span className="text-[11px] font-medium" style={{ color: "#27ae60" }}>Saved</span>}
+                </div>
+                <textarea
+                  className="mt-2.5"
+                  rows={3}
+                  value={noteDraft}
+                  onChange={(event) => { setNoteDraft(event.target.value); setNoteSaved(false); }}
+                  placeholder="Follow-up context, unlogged hours, site schedule, or a next step…"
+                />
+                <div className="mt-2 flex justify-end">
+                  <button
+                    onClick={saveNote}
+                    disabled={noteSaving || noteDraft === String(p.notes ?? "")}
+                    className="min-h-10 rounded-lg px-4 text-[12px] font-medium disabled:opacity-40"
+                    style={{ background: "#3498db18", color: "#3498db" }}
+                  >
+                    {noteSaving ? "Saving…" : "Save note"}
+                  </button>
+                </div>
               </div>
 
               {/* Checkpoint progress */}

@@ -486,9 +486,9 @@ function ExemptionsStep() {
       <H>Exemptions</H>
       <P>
         <p>Some members shouldn't be held to the hour requirements — study abroad, medical leave, special arrangements.
-          Add them as <strong>exemptions</strong> and they're excluded from risk statuses, critical lists, and Slack
+          Add them as <strong>exemptions</strong> and they're excluded from checkpoint statuses, the follow-up queue, and Communication Prep
           check-in queues, with the reason kept on record.</p>
-        <p className="mt-3">You'll find this under <strong>Settings → Exemptions</strong> once members are loaded:
+        <p className="mt-3">You'll find this under <strong>Settings → Long-term exemptions</strong> once members are loaded:
           pick the member, write a reason, done. You can remove an exemption at any time.</p>
       </P>
     </div>

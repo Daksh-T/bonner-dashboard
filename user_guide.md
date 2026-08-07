@@ -31,21 +31,53 @@ checkpoints and tells you, at a glance, who is on track and who needs help:
   seniors vs. everyone else, matched by graduation year). "Today's pace" is an
   interpolated goal for the current date, so you can run a report any day of
   the semester.
-- **Risk & pace analytics** — average weekly hours, pace needed to finish,
-  projected final hours, and a composite risk score that surfaces the members
-  most likely to fall short.
+- **Service-week pace analytics** — average weekly hours includes eligible
+  zero-hour weeks, while configured program breaks are removed from averages,
+  remaining pace, recent rhythm, and projections. Hours recorded during a
+  break still count toward totals and checkpoints. After a break, the queue
+  can surface students whose service has not resumed after the first complete
+  eligible week. See [Service-week pace](#service-week-pace) for the exact
+  definitions.
 - **Reflections** — finds impacts whose reflection fields are blank, grouped
   by member and severity, so you can chase missing reflections.
 - **Partners** — pending-verification hours by community partner, partner
   engagement totals, and per-partner drilldowns.
-- **Outreach** — generates ready-to-send checkpoint messages (Green / Yellow /
-  Red / Blue templates, editable in config) and tracks who has been contacted
-  on the Critical page.
+- **Follow-up** — a human review queue explains why each student surfaced,
+  tracks outreach and notes, and lets you snooze a student until a personal
+  review date. Message templates remain editable in Settings.
 - **Exports** — checkpoint hour tables and a paste-into-your-spreadsheet
   roster export that emits hours in the exact row order of your sheet.
 
 Everything runs **locally** from CSV exports — no live connection to GivePulse
 is required, and nothing leaves your machine.
+
+### Service-week pace
+
+The dashboard treats a service week as Monday through Sunday. A configured
+break removes every week it touches from the service calendar. That same
+calendar is used everywhere pace is calculated, so a break never inflates a
+student's required weekly pace.
+
+- **Avg / eligible wk** is the student's eligible hours divided by the number
+  of elapsed eligible weeks. Zero-hour eligible weeks remain in the divisor;
+  service during a break still counts toward total hours, but is not part of
+  this pace average.
+- **Recent 3-wk avg** is the average across the last three *completed*
+  eligible weeks, again including zero-hour weeks.
+- **Need / wk** is final-goal hours still needed divided by the remaining
+  eligible service weeks. For example, 71 hours remaining over 7 eligible
+  weeks is 10.14 hours per week (queue cards display it as 10.1h).
+- **Projected finish** is current total hours plus the eligible-week average
+  multiplied by the remaining eligible weeks.
+
+**Approved** hours exclude pending impacts; **Hours** includes them. The
+Follow-up queue calls out pending hours so you can confirm whether they would
+change the pace picture.
+
+Pace labels compare the eligible-week average with Need / wk: **On pace** meets
+or exceeds it, **Near pace** is short by up to 0.5 hours per week, **Behind
+pace** is further behind (or has no eligible weeks left), and **Goal reached**
+means the final goal is already met.
 
 ## Installing and running it locally
 
@@ -153,8 +185,11 @@ Notes on how the data is read:
 
 - Rows are matched by **email address**, lowercased.
 - Impacts dated before your program start or after the selected checkpoint
-  are ignored; **disputed** impacts are excluded; **pending** hours count
-  toward totals and are also reported separately.
+  are ignored unless **Count all impacts from the program start month** is
+  enabled. That option includes impacts from the first day of the start month
+  while leaving the program's expected service weeks unchanged. **Disputed**
+  impacts are excluded; **pending** hours count toward totals and are also
+  reported separately.
 - Column names can vary between GivePulse groups — the Settings pickers for
   reflection fields and the graduation-year column always show the columns of
   *your* uploaded files.
@@ -177,23 +212,34 @@ The first launch opens a guided walkthrough (replayable any time from
 
 ## The pages, one by one
 
-- **Overview** — status totals, cohort pulse (hours this week, pending hours),
-  class-by-class distribution, and drilldowns. Start here every week.
+- **Follow-up** — the default working queue. **Needs attention** includes
+  students with a checkpoint, recent-rhythm, post-break re-entry, or projected
+  final-goal signal. Use **Snoozed** to review students waiting for a chosen
+  date, and **All students** for healthy context. Each row shows approved
+  hours, the recent average, and need per week; use **Planning details** for
+  the full pace picture and conversation prompts. You can keep notes, mark
+  outreach, or snooze a student until a review date. Snoozing temporarily
+  removes the student from Needs attention and returns them automatically.
+- **Metrics** — status totals, cohort pulse (hours this week, pending hours),
+  consistent participation, class-by-class distribution, and drilldowns.
 - **Members** — the full roster with hours, goal, progress, pace, and status;
   filter by class or status, click a member for their full profile (weekly
-  activity chart, per-partner hours, checkpoint history, every impact).
+  activity chart, per-partner hours, checkpoint history, every impact, and a
+  Program Lead note shared with the Follow-up queue).
 - **Partners** — pending verification by partner (who to nudge) and overall
   partner engagement; click a partner for a detailed pending breakdown.
 - **Reflections** — members with blank reflections, ranked by severity, with
   the actual blank/filled impacts listed so you can follow up specifically.
+  Severity describes missing-reflection patterns only: Critical means every
+  impact is blank (with at least two impacts), High means at least three blanks
+  covering 75% or more, Moderate means at least two blanks covering 40% or
+  more, and Low covers the remaining one-or-more-blank cases.
 - **Communication** — a message queue for the selected checkpoint: each member
   gets a pre-filled message from your status templates, editable here; copy and
   send through Slack or whatever tool your program uses.
 - **Export** — checkpoint hour tables and the **roster-order export**: paste
   your spreadsheet's name column into Settings once, then copy a single
   column of hours that lines up row-for-row with your sheet.
-- **Critical** — red/blue members with outreach tracking: mark who has been
-  contacted, keep notes, and reset between checkpoints.
 - **Settings** — see below.
 
 The sidebar's checkpoint selector re-runs everything against any checkpoint,
@@ -202,8 +248,9 @@ or **Today's pace** for an interpolated goal as of today.
 ## Settings reference
 
 - **Data** — upload/replace the two CSV exports (drag & drop supported).
-- **Checkpoints & cohorts** — program name/start, cohorts (label + graduation
-  years + default flag), checkpoint table (date + hours per cohort), class
+- **Checkpoints & cohorts** — program name/start, program-wide break or
+  limited-service periods, the optional full start-month impact credit, cohorts
+  (label + graduation years + default flag), checkpoint table (date + hours per cohort), class
   labels (graduation year → display label), and **class & senior detection**:
   pick which CSV column holds the graduation year (first four digits are
   read, so "Spring 2029" → 2029), set a fallback text class column, or mark
@@ -214,9 +261,13 @@ or **Today's pace** for an interpolated goal as of today.
   empty. Leave the list empty to turn reflection tracking off.
 - **Roster export** — paste your spreadsheet's name column; blank lines are
   preserved as blank rows. A match preview shows unmatched names.
-- **Messages** — customize syntax for the messages that are built on the Communications page
-- **Exemptions** — excuse members from status logic (they show as Exempt and
-  are skipped by outreach/exports).
+- **Messages** — customize syntax for the messages that are built on the
+  Communications page. Available variables include logged and approved hours,
+  checkpoint goal, recent average and weeks, need per week and weeks left,
+  final goal and hours left, projected finish, and checkpoint/date language.
+- **Long-term exemptions** — excuse members from status logic (they show as
+  Exempt and are skipped by the Follow-up and Communication queues). Use a
+  Follow-up snooze instead for temporary context and a review date.
 - **Appearance** — theme, plus **portable settings**: export the entire
   configuration as JSON and re-import it anywhere.
 - **Help** — replay the walkthrough.
@@ -256,6 +307,10 @@ settings JSON).
 - **Seniors in the wrong tier** — check the cohort graduation years and the
   graduation-year column in Settings → Checkpoints & cohorts; use the manual
   senior picker if the export has no usable year.
+- **Need / wk does not match your expectation** — check the final goal, the
+  remaining eligible weeks, and break dates in Settings → Checkpoints &
+  cohorts. Every Monday–Sunday week touched by a configured break is excluded
+  from the divisor.
 - **A name won't match the roster export** — edit the pasted name to match
   the member's display name shown on the Members page.
 - **Start over** — delete the data dir (table above) and relaunch; the wizard

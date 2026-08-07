@@ -8,18 +8,34 @@ import {
 
 export type TemplateToken =
   | "hours"
+  | "approved_hours"
   | "goal"
+  | "recent_avg"
+  | "recent_weeks"
+  | "pace_needed"
+  | "remaining_service_weeks"
+  | "final_goal"
+  | "final_hours_needed"
+  | "projected_final_hours"
   | "run_date"
   | "ordinal"
   | "ordinal_word"
   | "checkpoint_number"
   | "checkpoint_name";
 
-const TOKEN_RE = /\{(hours|goal|run_date|ordinal|ordinal_word|checkpoint_number|checkpoint_name)\}/g;
+const TOKEN_RE = /\{(hours|approved_hours|goal|recent_avg|recent_weeks|pace_needed|remaining_service_weeks|final_goal|final_hours_needed|projected_final_hours|run_date|ordinal|ordinal_word|checkpoint_number|checkpoint_name)\}/g;
 
 const TOKEN_COLORS: Record<TemplateToken, string> = {
   hours: "#27ae60",
+  approved_hours: "#27ae60",
   goal: "#3498db",
+  recent_avg: "#14b8a6",
+  recent_weeks: "#14b8a6",
+  pace_needed: "#f39c12",
+  remaining_service_weeks: "#f39c12",
+  final_goal: "#3498db",
+  final_hours_needed: "#f39c12",
+  projected_final_hours: "#14b8a6",
   run_date: "#9b59b6",
   ordinal: "#e67e22",
   ordinal_word: "#e67e22",
@@ -29,7 +45,15 @@ const TOKEN_COLORS: Record<TemplateToken, string> = {
 
 const TOKEN_SHORT_LABEL: Record<TemplateToken, string> = {
   hours: "hours",
+  approved_hours: "approved",
   goal: "goal",
+  recent_avg: "recent avg",
+  recent_weeks: "recent wks",
+  pace_needed: "need / wk",
+  remaining_service_weeks: "weeks left",
+  final_goal: "final goal",
+  final_hours_needed: "hours left",
+  projected_final_hours: "projected",
   run_date: "date",
   ordinal: "2nd",
   ordinal_word: "second",

@@ -26,6 +26,8 @@ def init_db() -> None:
                 sent_date TEXT,
                 notes TEXT DEFAULT '',
                 checkpoint TEXT,
+                snoozed_until TEXT,
+                snooze_reason TEXT DEFAULT '',
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
@@ -43,6 +45,11 @@ def init_db() -> None:
             );
             """
         )
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(support_tracking)").fetchall()}
+        if "snoozed_until" not in columns:
+            conn.execute("ALTER TABLE support_tracking ADD COLUMN snoozed_until TEXT")
+        if "snooze_reason" not in columns:
+            conn.execute("ALTER TABLE support_tracking ADD COLUMN snooze_reason TEXT DEFAULT ''")
     # Demo seeds only apply to a fresh install; once the user has uploaded their
     # own CSVs the demo rows must not come back on restart.
     if _has_user_uploads():
@@ -212,6 +219,8 @@ def list_support_tracking() -> dict[str, dict]:
             "sent_date": row["sent_date"],
             "notes": row["notes"],
             "checkpoint": row["checkpoint"],
+            "snoozed_until": row["snoozed_until"],
+            "snooze_reason": row["snooze_reason"] or "",
             "updated_at": row["updated_at"],
         }
         for row in rows
@@ -228,12 +237,40 @@ def update_support_tracking(email: str, display_name: str, sent: bool, notes: st
             ON CONFLICT(email) DO UPDATE SET
                 display_name=excluded.display_name,
                 outreach_sent=excluded.outreach_sent,
-                sent_date=excluded.sent_date,
+                sent_date=CASE
+                    WHEN excluded.outreach_sent=0 THEN NULL
+                    WHEN support_tracking.outreach_sent=1 THEN support_tracking.sent_date
+                    ELSE excluded.sent_date
+                END,
                 notes=excluded.notes,
                 checkpoint=excluded.checkpoint,
                 updated_at=datetime('now')
             """,
             (email.strip().lower(), display_name, int(sent), sent_date, notes.strip(), checkpoint),
+        )
+
+
+def update_follow_up_snooze(
+    email: str,
+    display_name: str,
+    snoozed_until: str | None,
+    reason: str,
+    checkpoint: str,
+) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO support_tracking
+                (email, display_name, checkpoint, snoozed_until, snooze_reason, updated_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(email) DO UPDATE SET
+                display_name=excluded.display_name,
+                checkpoint=excluded.checkpoint,
+                snoozed_until=excluded.snoozed_until,
+                snooze_reason=excluded.snooze_reason,
+                updated_at=datetime('now')
+            """,
+            (email.strip().lower(), display_name, checkpoint, snoozed_until, reason.strip()),
         )
 
 
@@ -243,4 +280,9 @@ def reset_support_tracking(emails: list[str]) -> None:
         return
     placeholders = ",".join("?" for _ in cleaned)
     with connect() as conn:
-        conn.execute(f"DELETE FROM support_tracking WHERE email IN ({placeholders})", cleaned)
+        conn.execute(
+            f"""UPDATE support_tracking
+                SET outreach_sent=0, sent_date=NULL, notes='', updated_at=datetime('now')
+                WHERE email IN ({placeholders})""",
+            cleaned,
+        )

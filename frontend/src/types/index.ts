@@ -47,6 +47,12 @@ export interface CheckpointConfig {
   requirements: Record<string, number>;
 }
 
+export interface BreakPeriod {
+  label: string;
+  start: string;
+  end: string;
+}
+
 export interface ReflectionConfig {
   fields: string[];
   empty_values: string[];
@@ -70,6 +76,8 @@ export interface AppConfig {
   timezone: string;
   theme: "dark" | "light";
   program_start: string;
+  include_full_start_month_impacts: boolean;
+  break_periods: BreakPeriod[];
   cohorts: Cohort[];
   checkpoints: CheckpointConfig[];
   reflection: ReflectionConfig;
@@ -100,12 +108,28 @@ export interface MemberRow {
   exempt_reason: string;
   is_senior: boolean;
   active_weeks: number;
+  eligible_weeks_elapsed: number;
   avg_week: number;
+  approved_hours: number;
+  recent_avg: number;
+  recent_weeks: number;
+  recent_service_weeks: number;
+  rhythm_flag: boolean;
+  rhythm_reason: string;
+  post_break_reentry_flag: boolean;
+  post_break_reentry_reason: string;
+  requires_follow_up: boolean;
+  follow_up_reasons: string[];
+  conversation_prompts: string[];
   pace_needed: number;
   recent_hours: number;
   pace_gap: number;
   pace_ratio: number | null;
+  pace_label: "Behind pace" | "Near pace" | "On pace" | "Goal reached";
   risk_score: number;
+  weeks_remaining_to_cp4: number;
+  projected_final_hours: number;
+  projected_final_gap: number;
 }
 
 export interface OverviewResponse {

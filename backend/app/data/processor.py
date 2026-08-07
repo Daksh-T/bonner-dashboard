@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import math
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
 from .. import db
 from ..settings import (
     AppConfig,
+    BreakPeriod,
     RuntimeCheckpoint,
     checkpoint_number,
     checkpoint_ordinal,
@@ -112,7 +112,10 @@ def normalize_impacts(df: pd.DataFrame, checkpoint: RuntimeCheckpoint, config: A
     df["Hours Served"] = pd.to_numeric(df.get("Hours Served"), errors="coerce").fillna(0.0)
     df["email"] = df["Email"].astype(str).str.lower().str.strip()
     df["Verified"] = df.get("Verified", pd.Series("", index=df.index)).astype(str).fillna("").str.strip()
-    df = df[df["Start Date"] >= pd.Timestamp(config.program_start)]
+    impact_start = config.program_start
+    if config.include_full_start_month_impacts:
+        impact_start = config.program_start.replace(day=1)
+    df = df[df["Start Date"] >= pd.Timestamp(impact_start)]
     df = df[df["Start Date"] <= pd.Timestamp(checkpoint.date)]
     df = df[df["Verified"].str.lower() != "disputed"]
     return df.reset_index(drop=True)
@@ -146,21 +149,78 @@ def reflection_text(row: pd.Series, config: AppConfig) -> str:
     return ""
 
 
+def week_start(value: date) -> date:
+    """Return the Monday that owns ``value``."""
+    return value - timedelta(days=value.weekday())
+
+
+def _break_week_starts(periods: list[BreakPeriod]) -> set[date]:
+    starts: set[date] = set()
+    for period in periods:
+        start, end = sorted((period.start, period.end))
+        cursor = week_start(start)
+        final = week_start(end)
+        while cursor <= final:
+            starts.add(cursor)
+            cursor += timedelta(days=7)
+    return starts
+
+
+def eligible_service_week_starts(start: date, end: date, config: AppConfig) -> list[date]:
+    """Eligible Monday-start weeks intersecting the inclusive program range."""
+    if end < start:
+        return []
+    excluded = _break_week_starts(config.break_periods)
+    cursor = week_start(start)
+    final = week_start(end)
+    weeks: list[date] = []
+    while cursor <= final:
+        if cursor not in excluded:
+            weeks.append(cursor)
+        cursor += timedelta(days=7)
+    return weeks
+
+
+def service_calendar(reference_date: date, config: AppConfig) -> dict[str, list[date]]:
+    """Partition the configured program calendar once for every pace metric."""
+    bounded_reference = min(max(reference_date, config.program_start), config.program_end)
+    all_weeks = eligible_service_week_starts(config.program_start, config.program_end, config)
+    current = week_start(bounded_reference)
+    elapsed = [start for start in all_weeks if start <= current]
+    completed = [start for start in elapsed if start + timedelta(days=6) <= bounded_reference]
+    remaining = [start for start in all_weeks if start > current]
+    return {"all": all_weeks, "elapsed": elapsed, "completed": completed, "remaining": remaining}
+
+
+def latest_completed_reentry_week(reference_date: date, config: AppConfig) -> tuple[date, str] | None:
+    """Most recent break whose first eligible week has fully elapsed.
+
+    The re-entry signal is actionable only after that full Monday-Sunday week
+    has ended. Adjacent breaks are naturally skipped because the first week is
+    selected from the shared eligible calendar.
+    """
+    all_weeks = eligible_service_week_starts(config.program_start, config.program_end, config)
+    candidates: list[tuple[date, str]] = []
+    for period in config.break_periods:
+        break_end_week = week_start(max(period.start, period.end))
+        reentry_week = next((start for start in all_weeks if start > break_end_week), None)
+        if reentry_week and reentry_week + timedelta(days=6) <= reference_date:
+            candidates.append((reentry_week, period.label.strip() or "the break"))
+    return max(candidates, key=lambda item: item[0]) if candidates else None
+
+
 def remaining_weeks_until_final(current_date: date, config: AppConfig) -> int:
-    days_remaining = max(0, (config.program_end - current_date).days)
-    return math.ceil(days_remaining / 7) if days_remaining > 0 else 0
+    return len(service_calendar(current_date, config)["remaining"])
 
 
 def get_effective_reference_date(checkpoint_name: str | None = None, impacts_df: pd.DataFrame | None = None) -> date:
     checkpoint = resolve_checkpoint(checkpoint_name)
-    candidates = [checkpoint.date, date.today()]
-    source_df = impacts_df if impacts_df is not None else STATE.impacts_df
-    if source_df is not None and not source_df.empty and source_df["Start Date"].notna().any():
-        candidates.append(pd.Timestamp(source_df["Start Date"].max()).date())
-    return min(candidates)
+    # Logged activity must never freeze the clock: otherwise later zero-hour
+    # weeks disappear from averages and rhythm checks.
+    return min(checkpoint.date, date.today())
 
 
-def build_checkpoint_message(status: str, hours: float, checkpoint: RuntimeCheckpoint, goal_hours: float, config: AppConfig) -> str:
+def build_checkpoint_message(status: str, row: pd.Series, checkpoint: RuntimeCheckpoint, config: AppConfig) -> str:
     template = config.message_templates.get(status, "")
     if not template:
         return ""
@@ -172,8 +232,16 @@ def build_checkpoint_message(status: str, hours: float, checkpoint: RuntimeCheck
             "checkpoint_number": checkpoint_number(checkpoint.name, config),
             "checkpoint_name": checkpoint.name,
             "run_date": checkpoint.date.strftime("%B %-d, %Y"),
-            "goal": format_hours(goal_hours),
-            "hours": format_hours(hours),
+            "goal": format_hours(row["required"]),
+            "hours": format_hours(row["hours"]),
+            "approved_hours": format_hours(row["approved_hours"]),
+            "recent_avg": format_hours(row["recent_avg"]),
+            "recent_weeks": str(int(row["recent_weeks"])),
+            "pace_needed": format_hours(row["pace_needed"]),
+            "remaining_service_weeks": str(int(row["weeks_remaining_to_cp4"])),
+            "final_goal": format_hours(row["final_required"]),
+            "final_hours_needed": format_hours(row["final_still_needed"]),
+            "projected_final_hours": format_hours(row["projected_final_hours"]),
         },
     )
 
@@ -187,18 +255,44 @@ def build_member_table(users_df: pd.DataFrame, impacts_df: pd.DataFrame, checkpo
     final_cp = config.final_checkpoint()
     exemptions = db.get_exemptions()
     reference_date = get_effective_reference_date(checkpoint.name, impacts_df)
-    recent_cutoff = pd.Timestamp(reference_date) - pd.Timedelta(days=st.recent_window_days)
+    calendar = service_calendar(reference_date, config)
+    elapsed_week_starts = set(calendar["elapsed"])
+    recent_three = calendar["completed"][-3:]
+    recent_two = calendar["completed"][-2:]
+    weeks_remaining = len(calendar["remaining"])
+    reentry = latest_completed_reentry_week(reference_date, config)
+    reentry_week = reentry[0] if reentry else None
+    reentry_label = reentry[1] if reentry else ""
+    weeks_since_reentry = [
+        start for start in calendar["elapsed"] if reentry_week is not None and start >= reentry_week
+    ]
 
     hours_by_email = impacts_df.groupby("email")["Hours Served"].sum()
+    approved_hours = (
+        impacts_df[~impacts_df["Verified"].str.lower().isin(["pending"])]
+        .groupby("email")["Hours Served"].sum()
+    )
     pending_hours = (
         impacts_df[impacts_df["Verified"].str.lower() == "pending"].groupby("email")["Hours Served"].sum()
     )
-    recent_hours = impacts_df[impacts_df["Start Date"] >= recent_cutoff].groupby("email")["Hours Served"].sum()
+
+    if impacts_df.empty:
+        weekly_lookup: dict[tuple[str, date], float] = {}
+    else:
+        weekly_totals = (
+            impacts_df.assign(week_start=impacts_df["Start Date"].dt.to_period("W").dt.start_time.dt.date)
+            .groupby(["email", "week_start"])["Hours Served"]
+            .sum()
+        )
+        weekly_lookup = {(str(email), start): float(hours) for (email, start), hours in weekly_totals.items()}
+
+    def weekly_values(email: str, starts: list[date]) -> list[float]:
+        return [weekly_lookup.get((email, start), 0.0) for start in starts]
 
     member_df = users_df.copy()
     member_df["hours"] = member_df["email"].map(hours_by_email).fillna(0.0)
+    member_df["approved_hours"] = member_df["email"].map(approved_hours).fillna(0.0)
     member_df["pending_hours"] = member_df["email"].map(pending_hours).fillna(0.0)
-    member_df["recent_hours"] = member_df["email"].map(recent_hours).fillna(0.0)
     member_df["required"] = member_df["cohort_id"].apply(lambda c: checkpoint.req(c, default_id))
     member_df["final_required"] = member_df["cohort_id"].apply(
         lambda c: config.requirement(final_cp, c) if final_cp else 0.0
@@ -206,15 +300,49 @@ def build_member_table(users_df: pd.DataFrame, impacts_df: pd.DataFrame, checkpo
     member_df["still_needed"] = (member_df["required"] - member_df["hours"]).clip(lower=0)
     member_df["final_still_needed"] = (member_df["final_required"] - member_df["hours"]).clip(lower=0)
     member_df["progress_pct"] = ((member_df["hours"] / member_df["required"]) * 100).clip(upper=100).fillna(0)
-    # An empty groupby keeps the datetime dtype, which Series.map can't cast.
-    weeks_by_email = (
-        impacts_df.groupby("email")["Start Date"].apply(lambda s: s.dt.to_period("W").nunique())
-        if not impacts_df.empty
-        else pd.Series(dtype=float)
+    member_df["eligible_weeks_elapsed"] = len(calendar["elapsed"])
+    member_df["active_weeks"] = member_df["email"].apply(
+        lambda email: sum(1 for value in weekly_values(email, calendar["elapsed"]) if value > 0)
     )
-    member_df["active_weeks"] = member_df["email"].map(weeks_by_email).fillna(0).astype(int)
-    member_df["avg_week"] = (member_df["hours"] / member_df["active_weeks"].replace(0, 1)).round(2)
-    weeks_remaining = remaining_weeks_until_final(reference_date, config)
+    member_df["eligible_hours"] = member_df["email"].apply(
+        lambda email: sum(weekly_values(email, list(elapsed_week_starts)))
+    )
+    elapsed_count = len(calendar["elapsed"])
+    member_df["avg_week"] = (
+        (member_df["eligible_hours"] / elapsed_count).round(2) if elapsed_count else 0.0
+    )
+    member_df["recent_weeks"] = len(recent_three)
+    member_df["recent_avg"] = member_df["email"].apply(
+        lambda email: round(sum(weekly_values(email, recent_three)) / len(recent_three), 2) if recent_three else 0.0
+    )
+    member_df["recent_hours"] = member_df["email"].apply(
+        lambda email: round(sum(weekly_values(email, recent_two)), 2)
+    )
+    member_df["recent_service_weeks"] = member_df["email"].apply(
+        lambda email: sum(1 for value in weekly_values(email, recent_three) if value > 0)
+    )
+
+    def rhythm_reason(email: str) -> str:
+        last_two = weekly_values(email, recent_two)
+        last_three = weekly_values(email, recent_three)
+        if len(last_two) == 2 and all(value <= 0 for value in last_two):
+            return "No service visible in the last two eligible weeks"
+        if len(last_three) == 3 and sum(value > 0 for value in last_three) <= 1:
+            return "Service visible in only one of the last three eligible weeks"
+        return ""
+
+    member_df["rhythm_reason"] = member_df["email"].apply(rhythm_reason)
+    member_df["rhythm_flag"] = member_df["rhythm_reason"].astype(bool)
+
+    def post_break_reentry_reason(email: str) -> str:
+        if not reentry_week or not weeks_since_reentry:
+            return ""
+        if all(value <= 0 for value in weekly_values(email, weeks_since_reentry)):
+            return f"No service visible since the first eligible week after {reentry_label}"
+        return ""
+
+    member_df["post_break_reentry_reason"] = member_df["email"].apply(post_break_reentry_reason)
+    member_df["post_break_reentry_flag"] = member_df["post_break_reentry_reason"].astype(bool)
     member_df["weeks_remaining_to_cp4"] = weeks_remaining
     member_df["pace_needed"] = member_df.apply(
         lambda row: round(row["final_still_needed"] / weeks_remaining, 2)
@@ -234,6 +362,16 @@ def build_member_table(users_df: pd.DataFrame, impacts_df: pd.DataFrame, checkpo
     member_df["projected_final_gap"] = (
         (member_df["final_required"] - member_df["projected_final_hours"]).clip(lower=0).round(2)
     )
+    member_df["pace_label"] = member_df.apply(
+        lambda row: "Goal reached"
+        if row["final_still_needed"] <= 0
+        else "Behind pace"
+        if weeks_remaining == 0 or (row["pace_needed"] > 0 and row["pace_gap"] > 0.5)
+        else "Near pace"
+        if row["pace_needed"] > 0 and row["pace_gap"] > 0
+        else "On pace",
+        axis=1,
+    )
 
     def compute_status(row: pd.Series) -> str:
         if row["email"] in exemptions:
@@ -247,6 +385,55 @@ def build_member_table(users_df: pd.DataFrame, impacts_df: pd.DataFrame, checkpo
         return "Green"
 
     member_df["status"] = member_df.apply(compute_status, axis=1)
+    member_df["requires_follow_up"] = member_df.apply(
+        lambda row: row["status"] != "Exempt" and (
+            row["status"] in {"Red", "Blue"}
+            or (bool(row["rhythm_flag"]) and row["final_still_needed"] > 0)
+            or (bool(row["post_break_reentry_flag"]) and row["final_still_needed"] > 0)
+            or row["projected_final_gap"] > 0
+        ),
+        axis=1,
+    )
+
+    def follow_up_reasons(row: pd.Series) -> list[str]:
+        reasons: list[str] = []
+        if row["status"] == "Blue":
+            reasons.append("No service hours are visible for this checkpoint")
+        elif row["status"] == "Red":
+            reasons.append(f"{format_hours(row['still_needed'])} hours short of the checkpoint goal")
+        if row["post_break_reentry_reason"] and row["final_still_needed"] > 0:
+            reasons.append(str(row["post_break_reentry_reason"]))
+        elif row["rhythm_reason"] and row["final_still_needed"] > 0:
+            reasons.append(str(row["rhythm_reason"]))
+        if row["projected_final_gap"] > 0:
+            reasons.append(f"Current pace projects {format_hours(row['projected_final_gap'])} hours short of the final goal")
+        return reasons
+
+    member_df["follow_up_reasons"] = member_df.apply(follow_up_reasons, axis=1)
+
+    def conversation_prompts(row: pd.Series) -> list[str]:
+        prompts: list[str] = []
+        if row["pending_hours"] > 0:
+            prompts.append(
+                f"First verify whether the {format_hours(row['pending_hours'])} pending hours should change the visible pace picture."
+            )
+        if row["status"] == "Blue":
+            prompts.append("Ask whether service has begun and whether any completed hours are still unlogged.")
+        if row["post_break_reentry_flag"]:
+            prompts.append(
+                f"Ask whether the usual site schedule has resumed since {reentry_label} and whether any service is not yet visible."
+            )
+        elif row["rhythm_flag"]:
+            prompts.append(
+                "Ask whether the recent pattern reflects the site calendar, unlogged hours, or a change in the recurring weekly slot."
+            )
+        if row["projected_final_gap"] > 0:
+            prompts.append(
+                "Review the visible totals together, then ask which site and recurring weekly slot could make the remaining plan realistic."
+            )
+        return prompts
+
+    member_df["conversation_prompts"] = member_df.apply(conversation_prompts, axis=1)
     member_df["risk_score"] = member_df.apply(
         lambda row: round(
             (
@@ -256,14 +443,14 @@ def build_member_table(users_df: pd.DataFrame, impacts_df: pd.DataFrame, checkpo
                 else 0
             )
             + max(row["pace_gap"], 0) * st.weight_pace_gap
-            + (st.weight_stalled if row["recent_hours"] == 0 and row["hours"] > 0 else 0)
+            + (st.weight_stalled if row["rhythm_flag"] else 0)
             + min(row["pending_hours"], st.pending_cap),
             2,
         ),
         axis=1,
     )
     member_df["message"] = member_df.apply(
-        lambda row: build_checkpoint_message(row["status"], row["hours"], checkpoint, row["required"], config)
+        lambda row: build_checkpoint_message(row["status"], row, checkpoint, config)
         if row["status"] != "Exempt"
         else "",
         axis=1,
@@ -370,6 +557,7 @@ def get_member_profile(email: str) -> dict:
     )
     partner_breakdown = impacts.groupby("Group")["Hours Served"].sum().sort_values(ascending=False).reset_index()
     history = impacts.sort_values("Start Date", ascending=False)
+    tracking = db.list_support_tracking().get(email, {})
     cohort_id = member.get("cohort_id", config.default_cohort().id)
     checkpoint_progress = []
     for cp in config.sorted_checkpoints():
@@ -388,6 +576,11 @@ def get_member_profile(email: str) -> dict:
         )
     return {
         **member,
+        "outreach_sent": bool(tracking.get("outreach_sent", False)),
+        "sent_date": tracking.get("sent_date"),
+        "notes": tracking.get("notes", ""),
+        "snoozed_until": tracking.get("snoozed_until"),
+        "snooze_reason": tracking.get("snooze_reason", ""),
         "weekly_activity": [
             {"week": row["week"].strftime("%b %-d"), "hours": round(float(row["Hours Served"]), 2)}
             for _, row in weekly.iterrows()
@@ -417,12 +610,14 @@ def get_member_activity(email: str) -> list[dict]:
     impacts = STATE.impacts_df[STATE.impacts_df["email"] == email].copy()
     reference_date = get_effective_reference_date(STATE.active_checkpoint, STATE.impacts_df)
     all_periods = pd.period_range(start=pd.Timestamp(config.program_start), end=pd.Timestamp(reference_date), freq="W")
+    eligible_starts = set(eligible_service_week_starts(config.program_start, reference_date, config))
     weekly = pd.DataFrame(
         {
             "week_start": all_periods.start_time,
             "week_label": [period.start_time.strftime("%-m/%-d") for period in all_periods],
         }
     )
+    weekly["eligible"] = weekly["week_start"].dt.date.isin(eligible_starts)
     if not impacts.empty:
         actual = (
             impacts.assign(week_start=impacts["Start Date"].dt.to_period("W").dt.start_time)
@@ -440,6 +635,7 @@ def get_member_activity(email: str) -> list[dict]:
             "week_label": row["week_label"],
             "hours": round(float(row["hours"]), 2),
             "cumulative": round(float(row["cumulative"]), 2),
+            "eligible": bool(row["eligible"]),
         }
         for _, row in weekly.iterrows()
     ]

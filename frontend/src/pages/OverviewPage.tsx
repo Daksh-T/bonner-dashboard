@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, Clock, TrendingUp } from "lucide-react";
+import { Clock, TrendingUp } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api/client";
 import { Dialog, DialogContent } from "../components/ui/dialog";
@@ -24,7 +24,7 @@ export function OverviewPage({
   dataStatus,
 }: {
   onOpenProfile: (e: string) => void;
-  onNavigate: (page: "overview" | "members" | "partners" | "reflections" | "slack" | "export" | "critical" | "settings") => void;
+  onNavigate: (page: "overview" | "metrics" | "members" | "partners" | "reflections" | "slack" | "export" | "settings") => void;
   dataStatus: DataStatus | null;
 }) {
   const loaded = !!dataStatus?.loaded;
@@ -61,8 +61,8 @@ export function OverviewPage({
   // "Needs attention" is only the genuinely behind members (Red = behind pace,
   // Blue = nothing logged). On-track members flagged purely for unverified hours
   // are surfaced separately so a green badge never sits under "Needs attention".
-  const needsAttention = concerning.filter((m) => m.status === "Red" || m.status === "Blue");
   const pendingReview = concerning.filter((m) => m.status !== "Red" && m.status !== "Blue");
+  const consistent = insights.data?.consistent ?? [];
 
   if (!loaded && !overview.loading) {
     return (
@@ -76,12 +76,12 @@ export function OverviewPage({
   return (
     <div className="space-y-7">
       <div className="flex items-end justify-between">
-        <h1 className="text-[20px] font-semibold" style={{ color: "var(--text)" }}>
-          {CHECKPOINT_LABEL[dataStatus?.active_checkpoint ?? ""] ?? dataStatus?.active_checkpoint ?? "—"}
-          {dataStatus?.active_checkpoint !== "TODAY" && (
-            <span className="ml-2 text-[14px] font-normal" style={{ color: "var(--text-faint)" }}>checkpoint</span>
-          )}
-        </h1>
+        <div>
+          <h1 className="text-[20px] font-semibold" style={{ color: "var(--text)" }}>Program metrics</h1>
+          <div className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+            {CHECKPOINT_LABEL[dataStatus?.active_checkpoint ?? ""] ?? dataStatus?.active_checkpoint ?? "—"} checkpoint
+          </div>
+        </div>
         {pulse && (
           <div className="flex items-baseline gap-2">
             <span className="text-[34px] font-bold leading-none tabular-nums" style={{ color: "var(--text)" }}>
@@ -96,7 +96,7 @@ export function OverviewPage({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
         <div className="space-y-4">
-          <SectionHead icon={<AlertTriangle size={13} style={{ color: "#e74c3c" }} />} label="Needs attention" count={needsAttention.length} />
+          <SectionHead icon={<TrendingUp size={13} style={{ color: "#27ae60" }} />} label="Consistent participation" count={consistent.length} />
 
           {overview.loading || insights.loading ? (
             <div className="space-y-2">
@@ -104,15 +104,15 @@ export function OverviewPage({
                 <div key={i} className="h-16 animate-pulse-soft rounded-xl" style={{ background: "var(--surface)", animationDelay: `${i * 50}ms` }} />
               ))}
             </div>
-          ) : needsAttention.length === 0 ? (
+          ) : consistent.length === 0 ? (
             <div className="rounded-xl py-10 text-center text-[12px]" style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-faint)" }}>
-              No one is behind pace
+              Participation patterns will appear after several service weeks.
             </div>
           ) : (
-            <ul className="space-y-2" aria-label="Members needing attention">
-              {needsAttention.map((member) => (
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Members with consistent participation">
+              {consistent.map((member) => (
                 <li key={member.email}>
-                  <AtRiskCard member={member} variant="risk" onOpen={() => onOpenProfile(member.email)} />
+                  <PositiveMemberRow member={member} onOpen={() => onOpenProfile(member.email)} />
                 </li>
               ))}
             </ul>
@@ -736,6 +736,21 @@ function AtRiskCard({ member, onOpen, variant = "risk" }: { member: InsightBucke
   );
 }
 
+function PositiveMemberRow({ member, onOpen }: { member: InsightBucket; onOpen: () => void }) {
+  return (
+    <button onClick={onOpen} className="flex min-h-16 w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+      <div className="min-w-0">
+        <div className="truncate text-[12px] font-medium" style={{ color: "var(--text)" }}>{member.display_name}</div>
+        <div className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>{Number(member.active_weeks ?? 0)} weeks with service</div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="text-[14px] font-semibold tabular-nums" style={{ color: "#27ae60" }}>{Number(member.avg_week ?? 0).toFixed(1)}h</div>
+        <div className="text-[11px]" style={{ color: "var(--text-faint)" }}>eligible-week avg</div>
+      </div>
+    </button>
+  );
+}
+
 function AvgProgressModal({ series, members, loading, current }: { series: Array<RecordShape>; members: number; loading: boolean; current: number }) {
   const data = series.map((p) => ({
     label: String(p.label ?? ""),
@@ -832,5 +847,3 @@ function StatRow({ label, value, accent, onClick }: { label: string; value: stri
     </Tag>
   );
 }
-
-

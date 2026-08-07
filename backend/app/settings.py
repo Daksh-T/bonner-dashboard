@@ -40,6 +40,19 @@ class CheckpointConfig(BaseModel):
     requirements: dict[str, float] = Field(default_factory=dict)
 
 
+class BreakPeriod(BaseModel):
+    """A configured program-wide pause, expressed as an inclusive date range.
+
+    Calendar weeks touched by the range are removed from pace expectations. Any
+    service recorded during the period still counts toward hour totals and
+    checkpoints; short, individual absences use a member snooze instead.
+    """
+
+    label: str = "Break"
+    start: date
+    end: date
+
+
 class ReflectionConfig(BaseModel):
     # Impact columns that count as a "reflection". Empty list disables the feature.
     fields: list[str] = Field(default_factory=lambda: ["Review/Reflection"])
@@ -70,6 +83,8 @@ class AppConfig(BaseModel):
     timezone: str = "America/Chicago"
     theme: Literal["dark", "light"] = "dark"
     program_start: date = date(2026, 1, 1)
+    include_full_start_month_impacts: bool = False
+    break_periods: list[BreakPeriod] = Field(default_factory=list)
 
     cohorts: list[Cohort] = Field(default_factory=list)
     checkpoints: list[CheckpointConfig] = Field(default_factory=list)
@@ -224,6 +239,54 @@ TEMPLATE_VARIABLES = [
         "label": "Goal",
         "description": "Checkpoint goal hours",
         "example": "69",
+    },
+    {
+        "token": "approved_hours",
+        "label": "Approved hours",
+        "description": "Member's approved or verified hours",
+        "example": "62",
+    },
+    {
+        "token": "recent_avg",
+        "label": "Recent weekly average",
+        "description": "Average across the last three completed eligible service weeks, including zero-hour weeks",
+        "example": "6.5",
+    },
+    {
+        "token": "recent_weeks",
+        "label": "Recent service weeks",
+        "description": "Number of completed eligible weeks used for the recent average",
+        "example": "3",
+    },
+    {
+        "token": "pace_needed",
+        "label": "Hours needed per week",
+        "description": "Hours needed in each remaining eligible service week to reach the final goal",
+        "example": "10.14",
+    },
+    {
+        "token": "remaining_service_weeks",
+        "label": "Remaining service weeks",
+        "description": "Eligible service weeks remaining after configured breaks",
+        "example": "7",
+    },
+    {
+        "token": "final_goal",
+        "label": "Final goal",
+        "description": "Member's final program hour goal",
+        "example": "133",
+    },
+    {
+        "token": "final_hours_needed",
+        "label": "Hours remaining",
+        "description": "Hours still needed to reach the final goal",
+        "example": "71",
+    },
+    {
+        "token": "projected_final_hours",
+        "label": "Projected final hours",
+        "description": "Projected finish using the corrected eligible-week average",
+        "example": "118.5",
     },
     {
         "token": "run_date",

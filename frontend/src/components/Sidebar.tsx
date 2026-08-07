@@ -1,4 +1,4 @@
-import { BarChart2, FileText, Handshake, MessageSquare, RefreshCw, Settings, ShieldAlert, Users, X, Zap } from "lucide-react";
+import { BarChart2, FileText, Handshake, ListTodo, MessageSquare, RefreshCw, Settings, Users, X, Zap } from "lucide-react";
 import type { Page } from "../App";
 import type { DataStatus } from "../types";
 import { CHECKPOINT_LABEL, CHECKPOINTS } from "../lib/constants";
@@ -12,13 +12,13 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { page: "overview",    label: "Overview",       Icon: BarChart2     },
+  { page: "overview",    label: "Follow-up",      Icon: ListTodo      },
+  { page: "metrics",     label: "Metrics",        Icon: BarChart2     },
   { page: "members",     label: "Members",        Icon: Users         },
   { page: "partners",    label: "Partners",       Icon: Handshake     },
   { page: "reflections", label: "Reflections",    Icon: FileText      },
   { page: "slack",       label: "Communication",  Icon: MessageSquare },
   { page: "export",      label: "Export",         Icon: Zap           },
-  { page: "critical",    label: "Critical",       Icon: ShieldAlert   },
   { page: "settings",    label: "Settings",       Icon: Settings      },
 ];
 

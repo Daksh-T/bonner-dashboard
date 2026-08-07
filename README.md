@@ -1,8 +1,8 @@
 # Bonner Dashboard
 
-Checkpoint dashboard for Bonner service programs: hour progress, risk
-status, partner activity, reflection completion, exemptions, exports, and
-Slack-ready outreach messages. Runs entirely on your **GivePulse CSV exports**
+Follow-up and checkpoint dashboard for Bonner service programs: a human review
+queue, eligible-week pace, partner activity, reflection completion, temporary
+snoozes, exemptions, exports, and outreach messages. Runs entirely on your **GivePulse CSV exports**
 — locally, with nothing leaving your machine. A first-run wizard walks you
 through exporting your data and configuring checkpoints, cohorts, and
 reflections.
@@ -65,6 +65,10 @@ cd .. && ./start.sh
 
 Backend: `http://127.0.0.1:8000` · Frontend (Vite): `http://127.0.0.1:3000`
 
+The Vite dev server proxies `/api` and `/health` to the backend above. Set
+`VITE_API_TARGET` when the backend runs at a different address, for example
+`VITE_API_TARGET=http://127.0.0.1:9000 bun run dev`.
+
 ### Building the installers yourself
 
 `./packaging/build.sh` builds the frontend and packages everything with
@@ -76,7 +80,7 @@ name/notes.
 
 ### Where state lives
 
-Settings, exemptions, outreach state, and uploaded CSVs persist in SQLite.
+Settings, exemptions, outreach state, shared profile notes, snoozes, and uploaded CSVs persist in SQLite.
 From a source checkout: `backend/bonner.db` + `backend/uploads/`. The
 desktop/packaged app uses a per-user app-data dir instead
 (`~/Library/Application Support/BonnerDashboard` on macOS,
@@ -134,6 +138,15 @@ Two GivePulse exports drive everything (full walkthrough in the
 
 Upload both in **Settings → Data** (click or drag & drop). The newest upload
 of each kind wins; demo CSVs are used only until you upload your own.
+
+For calendar-based pace, configure your program start date and any
+program-wide breaks in **Settings → Checkpoints & cohorts**. Break weeks are
+excluded from pace expectations, while service recorded during those weeks
+still counts toward a member's totals and checkpoints. The [User Guide](user_guide.md#service-week-pace) defines each pace metric.
+
+If service from the first partial month should count, enable **Count all
+impacts from the program start month** there as well. This credits those
+impacts without adding pre-start weeks to pace calculations.
 
 ## Demo notes
 

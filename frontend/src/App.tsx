@@ -1,30 +1,31 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { AlertCircle, BarChart3, Database, ExternalLink, Loader2, Menu, RefreshCw, X } from "lucide-react";
 import { api } from "./api/client";
 import { Sidebar } from "./components/Sidebar";
-import { MemberProfile } from "./components/MemberProfile";
-import { OverviewPage } from "./pages/OverviewPage";
-import { MembersPage } from "./pages/MembersPage";
-import { PartnersPage } from "./pages/PartnersPage";
-import { ReflectionsPage } from "./pages/ReflectionsPage";
-import { SlackPage } from "./pages/SlackPage";
-import { ExportPage } from "./pages/ExportPage";
-import { CriticalPage } from "./pages/CriticalPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { Onboarding } from "./components/Onboarding";
 import { applyTheme } from "./lib/theme";
 import type { DataStatus } from "./types";
 
-export type Page = "overview" | "members" | "partners" | "reflections" | "slack" | "export" | "critical" | "settings";
+const MemberProfile = lazy(() => import("./components/MemberProfile").then((module) => ({ default: module.MemberProfile })));
+const OverviewPage = lazy(() => import("./pages/OverviewPage").then((module) => ({ default: module.OverviewPage })));
+const MembersPage = lazy(() => import("./pages/MembersPage").then((module) => ({ default: module.MembersPage })));
+const PartnersPage = lazy(() => import("./pages/PartnersPage").then((module) => ({ default: module.PartnersPage })));
+const ReflectionsPage = lazy(() => import("./pages/ReflectionsPage").then((module) => ({ default: module.ReflectionsPage })));
+const SlackPage = lazy(() => import("./pages/SlackPage").then((module) => ({ default: module.SlackPage })));
+const ExportPage = lazy(() => import("./pages/ExportPage").then((module) => ({ default: module.ExportPage })));
+const CriticalPage = lazy(() => import("./pages/CriticalPage").then((module) => ({ default: module.CriticalPage })));
+const SettingsPage = lazy(() => import("./pages/SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const Onboarding = lazy(() => import("./components/Onboarding").then((module) => ({ default: module.Onboarding })));
+
+export type Page = "overview" | "metrics" | "members" | "partners" | "reflections" | "slack" | "export" | "settings";
 
 const NAV_TITLES: Record<Page, string> = {
-  overview: "Overview",
+  overview: "Follow-up",
+  metrics: "Metrics",
   members: "Members",
   partners: "Partners",
   reflections: "Reflections",
   slack: "Communication",
   export: "Export",
-  critical: "Critical",
   settings: "Settings",
 };
 
@@ -181,26 +182,28 @@ export default function App() {
             key={page === "settings" ? "settings" : `${page}:${dataStatus?.last_loaded_at ?? ""}`}
             className="animate-fade-up min-h-full p-4 md:p-8"
           >
-            {page === "overview"    && <OverviewPage   onOpenProfile={setProfile} onNavigate={setPage} dataStatus={dataStatus} />}
-            {page === "members"     && <MembersPage    onOpenProfile={setProfile} dataStatus={dataStatus} />}
-            {page === "partners"    && <PartnersPage   dataStatus={dataStatus} />}
-            {page === "reflections" && <ReflectionsPage dataStatus={dataStatus} />}
-            {page === "slack"       && <SlackPage       dataStatus={dataStatus} />}
-            {page === "export"      && <ExportPage      dataStatus={dataStatus} checkpointNames={checkpointNames} />}
-            {page === "critical"    && <CriticalPage    onOpenProfile={setProfile} dataStatus={dataStatus} />}
-            {page === "settings"    && (
-              <SettingsPage
-                dataStatus={dataStatus}
-                onDataStatusChange={setDataStatus}
-                onConfigChange={refreshCheckpoints}
-                onOpenWalkthrough={() => setShowWalkthrough(true)}
-              />
-            )}
+            <Suspense fallback={<PageFallback />}>
+              {page === "overview"    && <CriticalPage   onOpenProfile={setProfile} dataStatus={dataStatus} />}
+              {page === "metrics"     && <OverviewPage   onOpenProfile={setProfile} onNavigate={setPage} dataStatus={dataStatus} />}
+              {page === "members"     && <MembersPage    onOpenProfile={setProfile} dataStatus={dataStatus} />}
+              {page === "partners"    && <PartnersPage   dataStatus={dataStatus} />}
+              {page === "reflections" && <ReflectionsPage dataStatus={dataStatus} />}
+              {page === "slack"       && <SlackPage       dataStatus={dataStatus} />}
+              {page === "export"      && <ExportPage      dataStatus={dataStatus} checkpointNames={checkpointNames} />}
+              {page === "settings"    && (
+                <SettingsPage
+                  dataStatus={dataStatus}
+                  onDataStatusChange={setDataStatus}
+                  onConfigChange={refreshCheckpoints}
+                  onOpenWalkthrough={() => setShowWalkthrough(true)}
+                />
+              )}
+            </Suspense>
           </div>
         </div>
       </main>
 
-      {showWalkthrough && !demoMode && <Onboarding onClose={closeWalkthrough} onComplete={onOnboardingDone} />}
+      {showWalkthrough && !demoMode && <Suspense fallback={null}><Onboarding onClose={closeWalkthrough} onComplete={onOnboardingDone} /></Suspense>}
       {showDemoPopup && demoMode && (
         <DemoPopup
           onClose={() => {
@@ -211,14 +214,20 @@ export default function App() {
       )}
 
       {profileEmail && (
-        <MemberProfile
-          email={profileEmail}
-          activeCheckpoint={dataStatus?.active_checkpoint ?? "CP3"}
-          onClose={() => setProfile(null)}
-        />
+        <Suspense fallback={null}>
+          <MemberProfile
+            email={profileEmail}
+            activeCheckpoint={dataStatus?.active_checkpoint ?? "CP3"}
+            onClose={() => setProfile(null)}
+          />
+        </Suspense>
       )}
     </div>
   );
+}
+
+function PageFallback() {
+  return <div className="space-y-3"><div className="h-8 w-48 animate-pulse-soft rounded-lg" style={{ background: "var(--surface)" }} />{[0, 1, 2, 3].map((index) => <div key={index} className="h-20 animate-pulse-soft rounded-xl" style={{ background: "var(--surface)", animationDelay: `${index * 50}ms` }} />)}</div>;
 }
 
 function DemoPopup({ onClose }: { onClose: () => void }) {

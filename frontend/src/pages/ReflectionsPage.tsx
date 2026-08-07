@@ -139,6 +139,24 @@ export function ReflectionsPage({ dataStatus }: { dataStatus: DataStatus | null 
             )}
           </div>
 
+          <section className="border-t pt-5" style={{ borderColor: "var(--border)" }} aria-labelledby="reflection-levels-heading">
+            <h2 id="reflection-levels-heading" className="text-[13px] font-semibold" style={{ color: "var(--text-2)" }}>What the reflection levels mean</h2>
+            <p className="mt-1 text-pretty text-[11px]" style={{ color: "var(--text-muted)" }}>
+              These levels describe missing-reflection patterns only. They do not measure service pace or predict completion.
+            </p>
+            <div className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+              {SEVERITY_ORDER.map((severity) => (
+                <div key={severity}>
+                  <div className="flex items-center gap-2 text-[12px] font-semibold" style={{ color: SEVERITY_COLORS[severity] }}>
+                    <span className="h-2 w-2 rounded-full" style={{ background: SEVERITY_COLORS[severity] }} />
+                    {severity}
+                  </div>
+                  <p className="mt-1 text-pretty text-[11px] leading-5" style={{ color: "var(--text-3)" }}>{SEVERITY_DEFINITIONS[severity]}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
         </>
       )}
 

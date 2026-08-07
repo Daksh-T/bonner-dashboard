@@ -54,6 +54,7 @@ export const api = {
   getPartnersEngagement: () => request<Array<Record<string, unknown>>>("/api/partners/engagement"),
   getReflections: () => request<{ summary: Record<string, number>; members: ReflectionMember[] }>("/api/reflections"),
   getCritical: () => request<Array<Record<string, unknown>>>("/api/critical"),
+  getFollowUp: () => request<Array<Record<string, unknown>>>("/api/follow-up"),
   updateSupport: (email: string, sent: boolean, notes: string) =>
     request("/api/critical/" + encodeURIComponent(email) + "/support", {
       method: "PUT",
@@ -63,6 +64,11 @@ export const api = {
     request("/api/critical/reset", {
       method: "POST",
       body: JSON.stringify({ emails }),
+    }),
+  updateFollowUpSnooze: (email: string, until: string | null, reason = "") =>
+    request("/api/follow-up/" + encodeURIComponent(email) + "/snooze", {
+      method: "PUT",
+      body: JSON.stringify({ until, reason }),
     }),
   getDateRange: (start: string, end: string) =>
     request<Array<Record<string, unknown>>>(`/api/daterange?start=${start}&end=${end}`),

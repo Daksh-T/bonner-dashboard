@@ -34,10 +34,10 @@ export function MembersPage({
     let out = rows;
     if (statusFilter !== "All") out = out.filter((r) => r.status === statusFilter);
     if (classFilter !== "All") out = out.filter((r) => r.class_label === classFilter);
-    if (insightFilter === "Behind pace") out = out.filter((r) => r.pace_needed > 0 && r.pace_gap > 0.5);
+    if (insightFilter === "Behind pace") out = out.filter((r) => r.pace_label === "Behind pace");
     if (insightFilter === "No recent activity") out = out.filter((r) => r.hours > 0 && r.recent_hours === 0);
     if (insightFilter === "Pending heavy") out = out.filter((r) => r.pending_hours >= 5);
-    if (insightFilter === "On pace") out = out.filter((r) => r.pace_needed === 0 || r.pace_gap <= 0);
+    if (insightFilter === "On pace") out = out.filter((r) => r.pace_label === "On pace" || r.pace_label === "Goal reached");
     if (search.trim()) {
       const q = search.toLowerCase();
       out = out.filter((r) => r.display_name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q));
